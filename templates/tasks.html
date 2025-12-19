@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-tasks me-2"></i>Управление задачами</h1>
+    {% if session.role in ['admin', 'manager'] %}
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+        <i class="fas fa-plus me-2"></i>Создать задачу
+    </button>
+    {% endif %}
+</div>
+
+<!-- Фильтры по статусу -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('tasks') }}" class="btn btn-outline-secondary {% if not status_filter %}active{% endif %}">
+                Все ({{ total_count }})
+            </a>
+            <a href="{{ url_for('tasks') }}?status=не начато" class="btn btn-outline-secondary {% if status_filter == 'не начато' %}active{% endif %}">
+                Не начато ({{ counts.get('не начато', 0) }})
+            </a>
+            <a href="{{ url_for('tasks') }}?status=в процессе" class="btn btn-outline-primary {% if status_filter == 'в процессе' %}active{% endif %}">
+                В процессе ({{ counts.get('в процессе', 0) }})
+            </a>
+            <a href="{{ url_for('tasks') }}?status=выполнено" class="btn btn-outline-success {% if status_filter == 'выполнено' %}active{% endif %}">
+                Выполнено ({{ counts.get('выполнено', 0) }})
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Карточки задач -->
+<div class="row">
+    {% for task in tasks %}
+    <div class="col-md-6 col-lg-4 mb-4" data-task-id="{{ task[0] }}">
+        <div class="card h-100 {% if task[4] == 'высокий' %}border-danger{% elif task[4] == 'средний' %}border-warning{% else %}border-info{% endif %}">
+            <div class="card-header 
+                {% if task[5] == 'выполнено' %}bg-success
+                {% elif task[5] == 'в процессе' %}bg-primary
+                {% else %}bg-secondary{% endif %} text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">{{ task[1]|truncate(30) }}</h6>
+                    <span class="badge bg-light text-dark">{{ task[8] or 'Не назначена' }}</span>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                {% if task[2] %}
+                <p class="card-text">{{ task[2]|truncate(100) }}</p>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-calendar me-1"></i>Срок: {{ task[3] }}
+                    </small>
+                </div>
+                
+                <div class="mb-3">
+                    <span class="badge 
+                        {% if task[4] == 'высокий' %}bg-danger
+                        {% elif task[4] == 'средний' %}bg-warning
+                        {% else %}bg-info{% endif %}">
+                        <i class="fas fa-flag me-1"></i>{{ task[4] }}
+                    </span>
+                    
+                    <span class="badge 
+                        {% if task[5] == 'выполнено' %}bg-success
+                        {% elif task[5] == 'в процессе' %}bg-primary
+                        {% else %}bg-secondary{% endif %}">
+                        {{ task[5] }}
+                    </span>
+                </div>
+                
+                <div class="mb-2">
+                    <small class="text-muted">
+                        <i class="fas fa-user me-1"></i>Создал: {{ task[10] or 'Система' }}
+                    </small>
+                </div>
+                
+                <div class="mb-2">
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>Создана: 
+                        {% if task[9] and task[9] is not string %}
+                            {{ task[9].strftime('%d.%m.%Y %H:%M') }}
+                        {% elif task[9] %}
+                            {{ task[9] }}
+                        {% else %}
+                            Не указано
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+            
+            <div class="card-footer bg-transparent">
+                <div class="btn-group w-100">
+                    <!-- Изменение статуса -->
+                    <form method="POST" action="{{ url_for('update_task_status', task_id=task[0]) }}" class="d-inline flex-grow-1">
+                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="не начато" {% if task[5] == 'не начато' %}selected{% endif %}>Не начато</option>
+                            <option value="в процессе" {% if task[5] == 'в процессе' %}selected{% endif %}>В процессе</option>
+                            <option value="выполнено" {% if task[5] == 'выполнено' %}selected{% endif %}>Выполнено</option>
+                        </select>
+                    </form>
+                    
+                    <!-- Кнопки для менеджеров и админов -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <div class="btn-group ms-2">
+                        <!-- Кнопка редактирования -->
+                        <button class="btn btn-outline-warning btn-sm" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#editTaskModal{{ task[0] }}"
+                                title="Редактировать">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        
+                        <!-- Кнопка удаления -->
+                        <form method="POST" 
+                              action="{{ url_for('delete_task', task_id=task[0]) }}" 
+                              class="d-inline"
+                              onclick="return confirm('Удалить задачу: {{ task[1] }}?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования задачи (только для менеджеров и админов) -->
+    {% if session.role in ['admin', 'manager'] %}
+    <div class="modal fade" id="editTaskModal{{ task[0] }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактировать задачу</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('edit_task', task_id=task[0]) }}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Название задачи:</label>
+                            <input type="text" name="title" class="form-control" value="{{ task[1] }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Описание:</label>
+                            <textarea name="description" class="form-control" rows="3">{{ task[2] or '' }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Срок выполнения:</label>
+                            <input type="date" name="due_date" class="form-control" value="{{ task[3] }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Приоритет:</label>
+                            <select name="priority" class="form-control" required>
+                                <option value="низкий" {% if task[4] == 'низкий' %}selected{% endif %}>Низкий</option>
+                                <option value="средний" {% if task[4] == 'средний' %}selected{% endif %}>Средний</option>
+                                <option value="высокий" {% if task[4] == 'высокий' %}selected{% endif %}>Высокий</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Статус:</label>
+                            <select name="status" class="form-control" required>
+                                <option value="не начато" {% if task[5] == 'не начато' %}selected{% endif %}>Не начато</option>
+                                <option value="в процессе" {% if task[5] == 'в процессе' %}selected{% endif %}>В процессе</option>
+                                <option value="выполнено" {% if task[5] == 'выполнено' %}selected{% endif %}>Выполнено</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Назначить на:</label>
+                            <select name="assigned_to" class="form-control">
+                                <option value="">Не назначать</option>
+                                {% for user in users %}
+                                <option value="{{ user[0] }}" {% if task[6] == user[0] %}selected{% endif %}>{{ user[1] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% if not tasks %}
+<div class="alert alert-info text-center">
+    <i class="fas fa-info-circle fa-2x mb-3"></i>
+    <h5>Задачи не найдены</h5>
+    <p>Создайте первую задачу или измените фильтры</p>
+</div>
+{% endif %}
+
+<!-- Модальное окно создания задачи (только для менеджеров и админов) -->
+{% if session.role in ['admin', 'manager'] %}
+<div class="modal fade" id="addTaskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создать новую задачу</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_task') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Название задачи:</label>
+                        <input type="text" name="title" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание:</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Срок выполнения:</label>
+                        <input type="date" name="due_date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Приоритет:</label>
+                        <select name="priority" class="form-control" required>
+                            <option value="низкий">Низкий</option>
+                            <option value="средний" selected>Средний</option>
+                            <option value="высокий">Высокий</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Назначить на:</label>
+                        <select name="assigned_to" class="form-control">
+                            <option value="">Не назначать</option>
+                            {% for user in users %}
+                            <option value="{{ user[0] }}">{{ user[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать задачу</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

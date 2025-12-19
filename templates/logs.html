@@ -1,0 +1,316 @@
+<!-- templates/logs.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-history me-2"></i>История изменений</h1>
+    <div class="btn-group">
+        <button class="btn btn-outline-secondary" onclick="window.location.reload()">
+            <i class="fas fa-sync-alt me-2"></i>Обновить
+        </button>
+        {% if total_logs > 0 %}
+        <button class="btn btn-outline-danger" onclick="clearLogs()">
+            <i class="fas fa-trash me-2"></i>Очистить историю
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="stat-card bg-primary">
+            <i class="fas fa-database fa-3x mb-3"></i>
+            <h3>{{ total_logs }}</h3>
+            <p>Всего записей</p>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card bg-success">
+            <i class="fas fa-user-shield fa-3x mb-3"></i>
+            <h3>{{ action_stats|length }}</h3>
+            <p>Типов действий</p>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card bg-info">
+            <i class="fas fa-layer-group fa-3x mb-3"></i>
+            <h3>{{ entity_stats|length }}</h3>
+            <p>Типов объектов</p>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Фильтры и статистика</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-chart-pie me-2"></i>Статистика по действиям:</h6>
+                <div class="list-group">
+                    {% for stat in action_stats %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        {% if stat[0] == 'create' %}
+                            <span><i class="fas fa-plus-circle text-success me-2"></i>Создание</span>
+                        {% elif stat[0] == 'update' %}
+                            <span><i class="fas fa-edit text-warning me-2"></i>Изменение</span>
+                        {% elif stat[0] == 'delete' %}
+                            <span><i class="fas fa-trash text-danger me-2"></i>Удаление</span>
+                        {% elif stat[0] == 'login' %}
+                            <span><i class="fas fa-sign-in-alt text-primary me-2"></i>Вход</span>
+                        {% elif stat[0] == 'logout' %}
+                            <span><i class="fas fa-sign-out-alt text-info me-2"></i>Выход</span>
+                        {% elif stat[0] == 'consumption' %}
+                            <span><i class="fas fa-minus-circle text-warning me-2"></i>Списание</span>
+                        {% elif stat[0] == 'system' %}
+                            <span><i class="fas fa-cog text-secondary me-2"></i>Система</span>
+                        {% else %}
+                            <span>{{ stat[0] }}</span>
+                        {% endif %}
+                        <span class="badge bg-primary rounded-pill">{{ stat[1] }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <h6><i class="fas fa-chart-bar me-2"></i>Статистика по объектам:</h6>
+                <div class="list-group">
+                    {% for stat in entity_stats %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        {% if stat[0] == 'animal' %}
+                            <span><i class="fas fa-cow me-2"></i>Животные</span>
+                        {% elif stat[0] == 'finance' %}
+                            <span><i class="fas fa-money-bill me-2"></i>Финансы</span>
+                        {% elif stat[0] == 'task' %}
+                            <span><i class="fas fa-tasks me-2"></i>Задачи</span>
+                        {% elif stat[0] == 'user' %}
+                            <span><i class="fas fa-users me-2"></i>Пользователи</span>
+                        {% elif stat[0] == 'meat' %}
+                            <span><i class="fas fa-drumstick-bite me-2"></i>Мясо</span>
+                        {% elif stat[0] == 'field' %}
+                            <span><i class="fas fa-tractor me-2"></i>Поля</span>
+                        {% elif stat[0] == 'machine' %}
+                            <span><i class="fas fa-tools me-2"></i>Техника</span>
+                        {% elif stat[0] == 'feed_type' %}
+                            <span><i class="fas fa-seedling me-2"></i>Типы корма</span>
+                        {% elif stat[0] == 'storage' %}
+                            <span><i class="fas fa-warehouse me-2"></i>Склад</span>
+                        {% elif stat[0] == 'order' %}
+                            <span><i class="fas fa-shopping-cart me-2"></i>Заказы</span>
+                        {% elif stat[0] == 'profile' %}
+                            <span><i class="fas fa-user me-2"></i>Профили</span>
+                        {% elif stat[0] == 'logs' %}
+                            <span><i class="fas fa-history me-2"></i>Логи</span>
+                        {% elif stat[0] == 'system' %}
+                            <span><i class="fas fa-cog me-2"></i>Система</span>
+                        {% else %}
+                            <span>{{ stat[0] }}</span>
+                        {% endif %}
+                        <span class="badge bg-primary rounded-pill">{{ stat[1] }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица логов -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Журнал действий (последние {{ per_page }} записей)</h5>
+    </div>
+    <div class="card-body">
+        {% if logs %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Дата/Время</th>
+                        <th>Пользователь</th>
+                        <th>Действие</th>
+                        <th>Объект</th>
+                        <th>Детали</th>
+                        <th>IP адрес</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>
+                            <small class="text-muted">
+                                {% if log[10] %}
+                                    {{ log[10].strftime('%d.%m.%Y') }}<br>
+                                    {{ log[10].strftime('%H:%M:%S') }}
+                                {% endif %}
+                            </small>
+                        </td>
+                        <td>
+                            <strong>{{ log[2] }}</strong><br>
+                            <small class="text-muted">
+                                {% if log[11] %}
+                                    {{ log[11] }} ({{ log[12] }})
+                                {% endif %}
+                            </small>
+                        </td>
+                        <td>
+                            {% if log[3] == 'create' %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-plus me-1"></i>Создание
+                                </span>
+                            {% elif log[3] == 'update' %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-edit me-1"></i>Изменение
+                                </span>
+                            {% elif log[3] == 'delete' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-trash me-1"></i>Удаление
+                                </span>
+                            {% elif log[3] == 'login' %}
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-sign-in-alt me-1"></i>Вход
+                                </span>
+                            {% elif log[3] == 'logout' %}
+                                <span class="badge bg-info">
+                                    <i class="fas fa-sign-out-alt me-1"></i>Выход
+                                </span>
+                            {% elif log[3] == 'consumption' %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-minus-circle me-1"></i>Списание
+                                </span>
+                            {% elif log[3] == 'system' %}
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-cog me-1"></i>Система
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ log[3] }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log[4] == 'animal' %}
+                                <i class="fas fa-cow me-1 text-success"></i>
+                            {% elif log[4] == 'finance' %}
+                                <i class="fas fa-money-bill me-1 text-warning"></i>
+                            {% elif log[4] == 'task' %}
+                                <i class="fas fa-tasks me-1 text-primary"></i>
+                            {% elif log[4] == 'user' %}
+                                <i class="fas fa-user me-1 text-info"></i>
+                            {% elif log[4] == 'meat' %}
+                                <i class="fas fa-drumstick-bite me-1 text-danger"></i>
+                            {% elif log[4] == 'field' %}
+                                <i class="fas fa-tractor me-1"></i>
+                            {% elif log[4] == 'machine' %}
+                                <i class="fas fa-tools me-1"></i>
+                            {% elif log[4] == 'feed_type' %}
+                                <i class="fas fa-seedling me-1 text-success"></i>
+                            {% elif log[4] == 'storage' %}
+                                <i class="fas fa-warehouse me-1"></i>
+                            {% elif log[4] == 'order' %}
+                                <i class="fas fa-shopping-cart me-1 text-primary"></i>
+                            {% elif log[4] == 'profile' %}
+                                <i class="fas fa-user-circle me-1 text-info"></i>
+                            {% elif log[4] == 'logs' %}
+                                <i class="fas fa-history me-1"></i>
+                            {% elif log[4] == 'system' %}
+                                <i class="fas fa-cog me-1 text-secondary"></i>
+                            {% endif %}
+                            
+                            {{ log[4]|capitalize }}
+                            
+                            {% if log[6] %}
+                                <br>
+                                <small class="text-muted">
+                                    {% if log[5] %}
+                                        ID: {{ log[5] }}<br>
+                                    {% endif %}
+                                    "{{ log[6]|truncate(20) }}"
+                                </small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log[7] %}
+                                <small>{{ log[7] }}</small>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ log[8] }}</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Пагинация -->
+        {% if total_pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('logs', page=page-1) }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p >= page-2 and p <= page+2 %}
+                    <li class="page-item {% if p == page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('logs', page=p) }}">{{ p }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                
+                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('logs', page=page+1) }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
+        
+        {% else %}
+        <div class="alert alert-info text-center">
+            <i class="fas fa-info-circle fa-2x mb-3"></i>
+            <h5>Журнал действий пуст</h5>
+            <p>Здесь будут отображаться все действия пользователей в системе</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function clearLogs() {
+    if (confirm('Вы уверены, что хотите очистить всю историю изменений? Это действие нельзя отменить.')) {
+        fetch('/api/clear_logs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('История успешно очищена');
+                window.location.reload();
+            } else {
+                alert('Ошибка при очистке истории');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Ошибка при очистке истории');
+        });
+    }
+}
+</script>
+{% endblock %}

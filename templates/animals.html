@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-cow me-2"></i>Управление животными</h1>
+    <div>
+        <!-- Кнопки экспорта/импорта -->
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-download me-2"></i>Экспорт
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='animals', format_type='excel') }}">
+                    <i class="fas fa-file-excel text-success me-2"></i>Excel (.xlsx)
+                </a></li>
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='animals', format_type='csv') }}">
+                    <i class="fas fa-file-csv text-primary me-2"></i>CSV (.csv)
+                </a></li>
+            </ul>
+        </div>
+
+        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#importModalAnimals">
+            <i class="fas fa-upload me-2"></i>Импорт
+        </button>
+        
+        {% if session.role in ['admin', 'manager'] %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAnimalModal">
+            <i class="fas fa-plus me-2"></i>Добавить животное
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Карточки животных -->
+<div class="row">
+    {% for animal in animals %}
+   <div class="col-md-6 col-lg-4 mb-4" data-animal-id="{{ animal[0] }}">
+        <div class="card h-100">
+            <!-- Фото животного -->
+            {% if animal[6] and animal[6] is string %}
+            <img src="{{ url_for('static', filename='uploads/' + animal[6]) }}" 
+                 class="card-img-top" 
+                 style="height: 250px; object-fit: cover; cursor: pointer;"
+                 alt="{{ animal[1] }}"
+                 data-bs-toggle="modal" 
+                 data-bs-target="#photoModal{{ animal[0] }}">
+            <small class="text-center text-muted mt-1 p-2">Нажмите для просмотра фото</small>
+            {% else %}
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
+                 style="height: 250px;">
+                <i class="fas fa-cow fa-3x text-muted"></i>
+            </div>
+            {% endif %}
+            
+            <div class="card-header 
+                {% if animal[7] == 'готов к забою' %}bg-success
+                {% elif animal[7] == 'продан' %}bg-secondary
+                {% elif animal[7] == 'забит' %}bg-danger
+                {% else %}bg-primary{% endif %} text-white">
+                <h5 class="mb-0">{{ animal[1] or 'Без имени' }}</h5>
+            </div>
+            
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Вид:</strong><br>
+                        {{ animal[2] }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Порода:</strong><br>
+                        {{ animal[3] }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Вес:</strong><br>
+                        <span class="fw-bold">{{ animal[5] }} кг</span>
+                    </div>
+                    <div class="col-6">
+                        <strong>Статус:</strong><br>
+                        <form method="POST" action="{{ url_for('update_animal_status', animal_id=animal[0]) }}" class="d-inline">
+                            <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option value="на откорме" {% if animal[7] == 'на откорме' %}selected{% endif %}>На откорме</option>
+                                <option value="готов к забою" {% if animal[7] == 'готов к забою' %}selected{% endif %}>Готов к забою</option>
+                                <option value="продан" {% if animal[7] == 'продан' %}selected{% endif %}>Продан</option>
+                                <option value="забит" {% if animal[7] == 'забит' %}selected{% endif %}>Забит</option>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6">
+                        <strong>Дата рождения:</strong><br>
+                        {{ animal[4].strftime('%Y-%m-%d') if animal[4] else '' }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Вакцинация:</strong><br>
+                        {% if animal[10] %}
+                            <small>
+                                <strong>{{ animal[10] }}</strong><br>
+                                {{ animal[11].strftime('%Y-%m-%d') if animal[11] else '' }}
+                            </small>
+                        {% else %}
+                            <span class="text-muted">Нет</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Цена (только для готовых к забою) -->
+                {% if animal[7] == 'готов к забою' %}
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <strong>Цена:</strong><br>
+                        {% if animal[15] %}
+                            <span class="fw-bold text-success">{{ animal[15] }} ₸</span>
+                            <button class="btn btn-sm btn-outline-primary mt-1" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#setPriceModal{{ animal[0] }}">
+                                <i class="fas fa-edit"></i> Изменить
+                            </button>
+                        {% else %}
+                            <span class="text-muted">Не указана</span>
+                            <br>
+                            <button class="btn btn-sm btn-outline-success mt-1" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#setPriceModal{{ animal[0] }}">
+                                <i class="fas fa-money-bill"></i> Установить
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if animal[10] and animal[12] %}
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <small class="text-muted">
+                            След. вакцинация: {{ animal[12].strftime('%Y-%m-%d') if animal[12] else '' }}
+                        </small>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="card-footer">
+                <div class="btn-group w-100">
+                    <!-- Кнопка просмотра фото (только если есть фото) -->
+                    {% if animal[6] and animal[6] is string %}
+                    <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#photoModal{{ animal[0] }}" title="Посмотреть фото">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Кнопка добавления веса -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addWeightModal{{ animal[0] }}" title="Добавить вес">
+                        <i class="fas fa-weight-hanging"></i>
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Кнопка вакцинации -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#vaccinationModal{{ animal[0] }}" title="Добавить вакцинацию">
+                        <i class="fas fa-syringe"></i>
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Кнопка редактирования -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <a href="{{ url_for('edit_animal', animal_id=animal[0]) }}" class="btn btn-outline-warning btn-sm" title="Редактировать">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Кнопка удаления (только для admin) -->
+                    {% if session.role == 'admin' %}
+                    <form method="POST" action="{{ url_for('delete_animal', animal_id=animal[0]) }}" class="d-inline" onsubmit="return confirm('Вы уверены, что хотите удалить это животное?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Удалить">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для установки/изменения цены -->
+    {% if animal[7] == 'готов к забою' %}
+    <div class="modal fade" id="setPriceModal{{ animal[0] }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Установка цены для {{ animal[1] or 'Без имени' }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('set_animal_price', animal_id=animal[0]) }}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Цена (₸):</label>
+                            <input type="number" step="0.01" name="price" class="form-control" 
+                                   value="{{ animal[15] if animal[15] else '' }}" 
+                                   placeholder="Введите цену" required>
+                        </div>
+                        <div class="alert alert-info">
+                            <small>
+                                <i class="fas fa-info-circle"></i> Цена устанавливается только для животных со статусом "готов к забою".<br>
+                                Животное: <strong>{{ animal[1] or 'Без имени' }}</strong><br>
+                                Порода: <strong>{{ animal[3] }}</strong><br>
+                                Вес: <strong>{{ animal[5] }} кг</strong>
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить цену</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Модальное окно для просмотра фото -->
+    {% if animal[6] and animal[6] is string %}
+    <div class="modal fade" id="photoModal{{ animal[0] }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Фото: {{ animal[1] or 'Без имени' }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="{{ url_for('static', filename='uploads/' + animal[6]) }}" 
+                         class="img-fluid" 
+                         style="max-height: 70vh; object-fit: contain;"
+                         alt="{{ animal[1] }}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Модальное окно для добавления веса -->
+    {% if session.role in ['admin', 'manager'] %}
+    <div class="modal fade" id="addWeightModal{{ animal[0] }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить вес для {{ animal[1] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('add_weight') }}">
+                    <div class="modal-body">
+                        <input type="hidden" name="animal_id" value="{{ animal[0] }}">
+                        <div class="mb-3">
+                            <label class="form-label">Вес (кг):</label>
+                            <input type="number" step="0.1" name="weight" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата измерения:</label>
+                            <input type="date" name="date" class="form-control" required value="{{ now.strftime('%Y-%m-%d') if now else '' }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Модальное окно для вакцинации -->
+    {% if session.role in ['admin', 'manager'] %}
+    <div class="modal fade" id="vaccinationModal{{ animal[0] }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Вакцинация {{ animal[1] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('add_vaccination', animal_id=animal[0]) }}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Тип вакцины:</label>
+                            <select name="vaccination_type" class="form-control" required>
+                                <option value="">Выберите вакцину</option>
+                                <option value="Вакцина от ящура">Вакцина от ящура</option>
+                                <option value="Вакцина от бруцеллеза">Вакцина от бруцеллеза</option>
+                                <option value="Комплексная вакцина">Комплексная вакцина</option>
+                                <option value="Другая">Другая вакцина</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата вакцинации:</label>
+                            <input type="date" name="vaccination_date" class="form-control" 
+                                   value="{{ animal[11].strftime('%Y-%m-%d') if animal[11] else '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Следующая вакцинация:</label>
+                            <input type="date" name="next_vaccination_date" class="form-control" 
+                                   value="{{ animal[12].strftime('%Y-%m-%d') if animal[12] else '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Примечания:</label>
+                            <textarea name="vaccination_notes" class="form-control" rows="3" placeholder="Дополнительная информация о вакцинации">{{ animal[13] or '' }}</textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-success">Сохранить вакцинацию</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Модальное окно добавления животного -->
+{% if session.role in ['admin', 'manager'] %}
+<div class="modal fade" id="addAnimalModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить новое животное</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_animal') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Имя животного:</label>
+                                <input type="text" name="name" class="form-control" placeholder="Например: Бычок-1">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Вид:</label>
+                                <select name="species" class="form-control" required>
+                                    <option value="">Выберите вид</option>
+                                    <option value="бычок">Бычок</option>
+                                    <option value="корова">Корова</option>
+                                    <option value="баран">Баран</option>
+                                    <option value="лошадь">Лошадь</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Порода:</label>
+                                <input type="text" name="breed" class="form-control" placeholder="Например: ангус" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Фото животного:</label>
+                                <input type="file" name="photo" class="form-control" accept="image/*">
+                                <small class="text-muted">Разрешенные форматы: JPG, PNG, GIF. Макс. размер: 16MB</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Дата рождения:</label>
+                                <input type="date" name="birth_date" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Текущий вес (кг):</label>
+                                <input type="number" step="0.1" name="current_weight" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Статус:</label>
+                                <select name="status" id="animalStatus" class="form-control" required>
+                                    <option value="на откорме">На откорме</option>
+                                    <option value="готов к забою">Готов к забою</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="priceFieldContainer" style="display: none;">
+                                <label class="form-label">Цена (₸):</label>
+                                <input type="number" step="0.01" name="price" id="priceInput" class="form-control" placeholder="Укажите цену">
+                                <small class="text-muted">Цена указывается только для животных, готовых к забою</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Добавить животное</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Управление отображением поля цены при добавлении животного
+document.addEventListener('DOMContentLoaded', function() {
+    const animalStatus = document.getElementById('animalStatus');
+    const priceFieldContainer = document.getElementById('priceFieldContainer');
+    const priceInput = document.getElementById('priceInput');
+    
+    if (animalStatus && priceFieldContainer) {
+        // Функция для обновления видимости поля цены
+        function updatePriceField() {
+            if (animalStatus.value === 'готов к забою') {
+                priceFieldContainer.style.display = 'block';
+                priceInput.required = true;
+            } else {
+                priceFieldContainer.style.display = 'none';
+                priceInput.required = false;
+                priceInput.value = '';
+            }
+        }
+        
+        // Инициализация при загрузке
+        updatePriceField();
+        
+        // Событие при изменении статуса
+        animalStatus.addEventListener('change', updatePriceField);
+    }
+});
+</script>
+{% endblock %}

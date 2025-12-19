@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-drumstick-bite me-2"></i>Учет мяса</h1>
+    <div>
+        <!-- Кнопки экспорта/импорта -->
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-download me-2"></i>Экспорт
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='meat', format_type='excel') }}">
+                    <i class="fas fa-file-excel text-success me-2"></i>Excel (.xlsx)
+                </a></li>
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='meat', format_type='csv') }}">
+                    <i class="fas fa-file-csv text-primary me-2"></i>CSV (.csv)
+                </a></li>
+            </ul>
+        </div>
+
+        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#importModalMeat">
+            <i class="fas fa-upload me-2"></i>Импорт
+        </button>
+        
+        {% if session.role in ['admin', 'manager'] %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMeatModal">
+            <i class="fas fa-plus me-2"></i>Добавить тушу
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- В конец файла meat.html добавить: -->
+
+<!-- Модальное окно импорта для мяса -->
+<div class="modal fade" id="importModalMeat" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Импорт данных (Мясо)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('import_table', table_name='meat') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Выберите файл:</label>
+                        <input type="file" name="file" class="form-control" accept=".xlsx,.xls,.csv" required>
+                        <small class="text-muted">
+                            Поддерживаемые форматы: Excel (.xlsx, .xls), CSV (.csv)<br>
+                            <a href="{{ url_for('export_table', table_name='meat', format_type='excel') }}" 
+                               class="text-decoration-none">
+                               <i class="fas fa-download me-1"></i>Скачать шаблон Excel
+                            </a>
+                        </small>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>Внимание:</strong><br>
+                        • Файл должен содержать колонки: Порода, Вес туши, Цена, Статус<br>
+                        • Обязательные поля: Порода, Вес туши, Цена, Статус<br>
+                        • Дата в формате: ГГГГ-ММ-ДД
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Импортировать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Карточки туш -->
+<div class="row">
+    {% for piece in meat %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            {% if piece[8] %}  {# photo #}
+            <img src="{{ url_for('static', filename='uploads/' + piece[8]) }}" 
+                 class="card-img-top" 
+                 style="height: 250px; object-fit: cover; cursor: pointer;"
+                 alt="Туша {{ piece[2] }}"
+                 data-bs-toggle="modal" 
+                 data-bs-target="#photoModal{{ piece[0] }}">
+            {% else %}
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
+                 style="height: 250px;">
+                <i class="fas fa-drumstick-bite fa-3x text-muted"></i>
+            </div>
+            {% endif %}
+            
+            <div class="card-header 
+                {% if piece[9] == 'в наличии' %}bg-success
+                {% elif piece[9] == 'продано' %}bg-secondary
+                {% else %}bg-warning{% endif %} text-white">
+                <h5 class="mb-0">Туша {{ piece[2] }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Порода:</strong><br>
+                        {{ piece[2] }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Цена:</strong><br>
+                        <span class="text-success fw-bold">{{ "%.2f"|format(piece[6] | float) }} ₸</span>
+                    </div>
+
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Дата рождения:</strong><br>
+                        {{ piece[3] or 'Не указана' }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Дата забоя:</strong><br>
+                        {{ piece[4] }}
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6">
+                        <strong>Вес туши:</strong><br>
+                        {{ "%.2f"|format(piece[5] | float) }} кг
+                    </div>
+
+                    <div class="col-6">
+                        <strong>Статус:</strong><br>
+                        <form method="POST" action="{{ url_for('update_meat_status', meat_id=piece[0]) }}" class="d-inline">
+                            <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option value="в наличии" {% if piece[9] == 'в наличии' %}selected{% endif %}>В наличии</option>
+                                <option value="продано" {% if piece[9] == 'продано' %}selected{% endif %}>Продано</option>
+                                <option value="зарезервировано" {% if piece[9] == 'зарезервировано' %}selected{% endif %}>Зарезервировано</option>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+                {% if piece[10] %}  {# description #}
+                <div class="mt-2">
+                    <strong>Описание:</strong><br>
+                    <small class="text-muted">{{ piece[10] }}</small>
+                </div>
+                {% endif %}
+                {% if piece[1] %}  {# animal_id #}
+                <div class="mt-2">
+                    <small class="text-info">
+                        <i class="fas fa-cow me-1"></i>Исходное животное: {{ piece[12] or 'Не указано' }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <div class="btn-group w-100">
+                    <!-- Кнопка редактирования (только для admin и manager) -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <button class="btn btn-outline-warning btn-sm" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#editMeatModal{{ piece[0] }}">
+                        <i class="fas fa-edit"></i> Изменить
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Кнопка удаления (только для admin и manager) -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <form method="POST" 
+                          action="{{ url_for('delete_meat', meat_id=piece[0]) }}" 
+                          class="d-inline"
+                          onsubmit="return confirm('Удалить тушу {{ piece[2] }}?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-trash"></i> Удалить
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для просмотра фото -->
+    {% if piece[8] %}
+    <div class="modal fade" id="photoModal{{ piece[0] }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Фото туши: {{ piece[2] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="{{ url_for('static', filename='uploads/' + piece[8]) }}" 
+                         class="img-fluid" 
+                         style="max-height: 70vh; object-fit: contain;"
+                         alt="Туша {{ piece[2] }}">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Модальное окно редактирования туши (только для admin и manager) -->
+    {% if session.role in ['admin', 'manager'] %}
+    <div class="modal fade" id="editMeatModal{{ piece[0] }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактирование туши: {{ piece[2] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" 
+                      action="{{ url_for('edit_meat', meat_id=piece[0]) }}" 
+                      enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Порода:</label>
+                                    <input type="text" name="breed" class="form-control" value="{{ piece[2] }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Дата рождения:</label>
+                                    <input type="date" name="birth_date" class="form-control" value="{{ piece[3] or '' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Дата забоя:</label>
+                                    <input type="date" name="slaughter_date" class="form-control" value="{{ piece[4] }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Вес туши (кг):</label>
+                                    <input type="number" step="0.01" name="carcass_weight" 
+                                    class="form-control" value="{{ piece[5] }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Цена (₸):</label>
+                                    <input type="number" step="0.01" name="price" 
+                                    class="form-control" value="{{ piece[6] }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Статус:</label>
+                                    <select name="status" class="form-control" required>
+                                        <option value="в наличии" {% if piece[9] == 'в наличии' %}selected{% endif %}>В наличии</option>
+                                        <option value="продано" {% if piece[9] == 'продано' %}selected{% endif %}>Продано</option>
+                                        <option value="зарезервировано" {% if piece[9] == 'зарезервировано' %}selected{% endif %}>Зарезервировано</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Описание:</label>
+                            <textarea name="description" class="form-control" rows="3">{{ piece[10] or '' }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Новое фото туши:</label>
+                            <input type="file" name="photo" class="form-control" accept="image/*">
+                            {% if piece[8] %}
+                            <div class="mt-2">
+                                <small class="text-muted">Текущее фото:</small><br>
+                                <img src="{{ url_for('static', filename='uploads/' + piece[8]) }}" 
+                                     style="max-width: 100px; max-height: 100px; object-fit: cover; border-radius: 5px;">
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Модальное окно добавления туши (только для admin и manager) -->
+{% if session.role in ['admin', 'manager'] %}
+<div class="modal fade" id="addMeatModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить новую тушу</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_meat') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Порода:</label>
+                                <input type="text" name="breed" class="form-control" placeholder="Например: ангус, герефорд" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Дата рождения:</label>
+                                <input type="date" name="birth_date" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Дата забоя:</label>
+                                <input type="date" name="slaughter_date" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Вес туши (кг):</label>
+                                <input type="number" step="0.1" name="carcass_weight" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Цена (₸):</label>
+                                <input type="number" step="0.01" name="price" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Статус:</label>
+                                <select name="status" class="form-control" required>
+                                    <option value="в наличии">В наличии</option>
+                                    <option value="продано">Продано</option>
+                                    <option value="зарезервировано">Зарезервировано</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание:</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Дополнительная информация о туше"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Фото туши:</label>
+                        <input type="file" name="photo" class="form-control" accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Добавить тушу</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

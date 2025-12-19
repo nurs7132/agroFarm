@@ -1,0 +1,849 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-gamepad me-2"></i>Игра Ферма</h1>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Назад
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="fas fa-puzzle-piece me-2"></i>Ферма памяти - Сопоставление животных</h5>
+    </div>
+    <div class="card-body">
+        <!-- Контейнер игры -->
+        <div id="farmGameContainer">
+            <!-- Игра загрузится здесь -->
+            <div class="text-center py-5">
+                <div class="spinner-border text-success" role="status">
+                    <span class="visually-hidden">Игра загружается...</span>
+                </div>
+                <p class="mt-3">Игра загружается...</p>
+            </div>
+        </div>
+        
+        <!-- Информация об игре -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">Инструкция к игре</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul>
+                            <li>Откройте две карты и найдите одинаковых животных</li>
+                            <li>Игра заканчивается, когда найдены все пары</li>
+                            <li>Следите за количеством ходов и вашим временем</li>
+                            <li>Нажатие кнопки помощи стоит -10 очков</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-warning text-white">
+                        <h6 class="mb-0">Правила начисления очков</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul>
+                            <li>Совпадение: <strong class="text-success">+20 очков</strong></li>
+                            <li>Ошибка: <strong class="text-danger">-5 очков</strong></li>
+                            <li>Помощь: <strong class="text-danger">-10 очков</strong></li>
+                            <li>Оставшееся время: <strong class="text-success">×5 очков</strong></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика игры (дополнительно) -->
+<div class="card mt-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Статистика игры</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 text-center">
+                <h3 id="totalWins">0</h3>
+                <p class="text-muted">Количество побед</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <h3 id="bestScore">0</h3>
+                <p class="text-muted">Наивысший счет</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <h3 id="bestTime">-</h3>
+                <p class="text-muted">Лучшее время</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <h3 id="totalGames">0</h3>
+                <p class="text-muted">Сыгранные игры</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Загрузка игры
+    document.addEventListener('DOMContentLoaded', function() {
+        loadFarmGame();
+        loadGameStats();
+    });
+    
+    function loadFarmGame() {
+        const gameContainer = document.getElementById('farmGameContainer');
+        
+        // HTML игры (эту часть можно также загружать из отдельного файла)
+        const gameHTML = `
+        <div class="game-section">
+            <div class="game-card">
+                <div class="game-header">
+                    <h1 class="game-title">🎮 Ферма памяти</h1>
+                    <p class="game-description">Найдите одинаковых животных на ферме! Откройте две карты и найдите совпадения.</p>
+                </div>
+                
+                <div class="difficulty-controls">
+                    <button class="difficulty-btn active" data-level="easy">Легкий (8 карт)</button>
+                    <button class="difficulty-btn" data-level="medium">Средний (12 карт)</button>
+                    <button class="difficulty-btn" data-level="hard">Сложный (16 карт)</button>
+                </div>
+                
+                <div class="game-info">
+                    <div class="game-stat">
+                        <div class="game-stat-value" id="moves">0</div>
+                        <div class="game-stat-label">Ходы</div>
+                    </div>
+                    <div class="game-stat">
+                        <div class="game-stat-value" id="timer">60</div>
+                        <div class="game-stat-label">Время</div>
+                    </div>
+                    <div class="game-stat">
+                        <div class="game-stat-value" id="score">0</div>
+                        <div class="game-stat-label">Очки</div>
+                    </div>
+                </div>
+                
+                <div class="game-grid" id="gameGrid"></div>
+                
+                <div class="game-controls">
+                    <button class="btn btn-success btn-lg" id="startBtn">Начать игру</button>
+                    <button class="btn btn-warning btn-lg" id="restartBtn" disabled>Начать заново</button>
+                    <button class="btn btn-info btn-lg" id="hintBtn">Помощь</button>
+                </div>
+                
+                <div class="achievements">
+                    <div class="achievement">
+                        <span class="achievement-icon">⭐</span>
+                        <span>Количество ходов: <span id="bestMoves">0</span></span>
+                    </div>
+                    <div class="achievement">
+                        <span class="achievement-icon">🏆</span>
+                        <span>Победы: <span id="wins">0</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-over" id="gameOver">
+            <div class="game-over-content">
+                <h2 class="game-result-title" id="resultTitle">Поздравляем!</h2>
+                <div class="game-result-score" id="finalScore">0 очков</div>
+                <p id="resultMessage">Вы нашли всех животных!</p>
+                <div style="margin: 30px 0;">
+                    <div>Ходы: <strong id="finalMoves">0</strong></div>
+                    <div>Время: <strong id="finalTime">0</strong> секунд</div>
+                    <div>Очки: <strong id="finalScoreValue">0</strong></div>
+                </div>
+                <button class="btn btn-success btn-lg" id="playAgainBtn">Играть снова</button>
+                <button class="btn btn-secondary btn-lg" style="margin-top: 15px;" id="closeGameBtn">Закрыть</button>
+            </div>
+        </div>
+        
+        <div class="sound-toggle" id="soundToggle">🔈</div>
+        `;
+        
+        gameContainer.innerHTML = gameHTML;
+        
+        // Добавление стилей игры
+        addGameStyles();
+        
+        // Инициализация игры
+        initializeFarmGame();
+    }
+    
+    function addGameStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .game-section {
+                margin: 30px auto;
+                max-width: 1200px;
+                padding: 20px;
+            }
+            
+            .game-card {
+                background: linear-gradient(145deg, #f8fff8, #e8f5e9);
+                border-radius: 20px;
+                padding: 30px;
+                box-shadow: 0 10px 30px rgba(76, 175, 80, 0.15);
+                border: 2px solid #c8e6c9;
+            }
+            
+            .game-header {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            
+            .game-title {
+                color: #2E7D32;
+                font-size: 2.5rem;
+                margin-bottom: 10px;
+            }
+            
+            .game-description {
+                color: #558B2F;
+                font-size: 1.2rem;
+                margin-bottom: 20px;
+            }
+            
+            .game-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px;
+                margin: 30px auto;
+                max-width: 800px;
+            }
+            
+            .game-card-item {
+                aspect-ratio: 1;
+                background: linear-gradient(135deg, #4CAF50, #2E7D32);
+                border-radius: 15px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                font-size: 2.5rem;
+                color: white;
+                transform-style: preserve-3d;
+                transition: transform 0.6s;
+                position: relative;
+            }
+            
+            .game-card-item.flipped {
+                transform: rotateY(180deg);
+                background: white;
+                border: 3px solid #4CAF50;
+            }
+            
+            .game-card-item.matched {
+                background: linear-gradient(135deg, #FF9800, #F57C00);
+                cursor: default;
+                transform: rotateY(180deg) scale(0.95);
+            }
+            
+            .card-front, .card-back {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                backface-visibility: hidden;
+                border-radius: 15px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .card-front {
+                background: linear-gradient(135deg, #4CAF50, #2E7D32);
+                color: white;
+            }
+            
+            .card-back {
+                background: white;
+                color: #2E7D32;
+                transform: rotateY(180deg);
+                border: 3px solid #4CAF50;
+                font-size: 3rem;
+            }
+            
+            .game-info {
+                display: flex;
+                justify-content: space-around;
+                margin-bottom: 30px;
+                background: white;
+                padding: 20px;
+                border-radius: 15px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            }
+            
+            .game-stat {
+                text-align: center;
+            }
+            
+            .game-stat-value {
+                font-size: 2.5rem;
+                font-weight: bold;
+                color: #2E7D32;
+            }
+            
+            .game-stat-label {
+                color: #666;
+                font-size: 1.1rem;
+            }
+            
+            .game-controls {
+                text-align: center;
+                margin-top: 30px;
+            }
+            
+            .difficulty-controls {
+                display: flex;
+                justify-content: center;
+                gap: 10px;
+                margin: 20px 0;
+            }
+            
+            .difficulty-btn {
+                padding: 10px 20px;
+                border: 2px solid #4CAF50;
+                background: white;
+                color: #4CAF50;
+                border-radius: 25px;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+            
+            .difficulty-btn.active {
+                background: #4CAF50;
+                color: white;
+            }
+            
+            .game-over {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 1000;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .game-over-content {
+                background: white;
+                padding: 40px;
+                border-radius: 20px;
+                text-align: center;
+                max-width: 500px;
+                animation: popIn 0.5s ease;
+            }
+            
+            @keyframes popIn {
+                from {
+                    transform: scale(0.5);
+                    opacity: 0;
+                }
+                to {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+            
+            .game-result-title {
+                color: #2E7D32;
+                font-size: 2.5rem;
+                margin-bottom: 20px;
+            }
+            
+            .game-result-score {
+                font-size: 3rem;
+                color: #FF9800;
+                margin: 20px 0;
+            }
+            
+            .achievements {
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+                margin-top: 30px;
+                flex-wrap: wrap;
+            }
+            
+            .achievement {
+                background: #E8F5E9;
+                padding: 15px 25px;
+                border-radius: 50px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                border: 2px solid #C8E6C9;
+            }
+            
+            .achievement-icon {
+                color: #FF9800;
+                font-size: 1.5rem;
+            }
+            
+            .sound-toggle {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: white;
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.5rem;
+                color: #4CAF50;
+                cursor: pointer;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+                z-index: 100;
+                border: 2px solid #4CAF50;
+            }
+            
+            @keyframes matchAnimation {
+                0% { transform: rotateY(180deg) scale(1); }
+                50% { transform: rotateY(180deg) scale(1.1); }
+                100% { transform: rotateY(180deg) scale(0.95); }
+            }
+            
+            .matched {
+                animation: matchAnimation 0.5s ease;
+            }
+            
+            @keyframes newCardAnimation {
+                0% { transform: rotateY(0) scale(0); }
+                100% { transform: rotateY(0) scale(1); }
+            }
+            
+            .game-card-item {
+                animation: newCardAnimation 0.5s ease;
+            }
+            
+            @media (max-width: 768px) {
+                .game-grid {
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 10px;
+                }
+                
+                .game-card-item {
+                    font-size: 2rem;
+                }
+                
+                .card-back {
+                    font-size: 2.5rem;
+                }
+                
+                .game-title {
+                    font-size: 2rem;
+                }
+                
+                .game-info {
+                    flex-direction: column;
+                    gap: 15px;
+                }
+                
+                .difficulty-controls {
+                    flex-direction: column;
+                    align-items: center;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .game-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+                
+                .game-controls .btn {
+                    margin: 5px;
+                    width: 100%;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    function initializeFarmGame() {
+        // Логика игры (код из предыдущего ответа)
+        let gameActive = false;
+        let canFlip = true;
+        let moves = 0;
+        let score = 0;
+        let timer = 60;
+        let timerInterval;
+        let matchedPairs = 0;
+        let totalPairs = 8;
+        let flippedCards = [];
+        let soundEnabled = true;
+        let difficulty = 'easy';
+        
+        const farmEmojis = {
+            easy: ['🐄', '🐑', '🐖', '🐓', '🐄', '🐑', '🐖', '🐓'],
+            medium: ['🐄', '🐑', '🐖', '🐓', '🐎', '🐕', '🐄', '🐑', '🐖', '🐓', '🐎', '🐕'],
+            hard: ['🐄', '🐑', '🐖', '🐓', '🐎', '🐕', '🌾', '🚜', '🐄', '🐑', '🐖', '🐓', '🐎', '🐕', '🌾', '🚜']
+        };
+        
+        // Получение достижений из localStorage
+        let bestMoves = localStorage.getItem('farmGame_bestMoves') || 0;
+        let wins = localStorage.getItem('farmGame_wins') || 0;
+        let bestScore = localStorage.getItem('farmGame_bestScore') || 0;
+        let bestTime = localStorage.getItem('farmGame_bestTime') || null;
+        let totalGames = localStorage.getItem('farmGame_totalGames') || 0;
+        
+        // DOM элементы
+        const gameGrid = document.getElementById('gameGrid');
+        const movesElement = document.getElementById('moves');
+        const timerElement = document.getElementById('timer');
+        const scoreElement = document.getElementById('score');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const hintBtn = document.getElementById('hintBtn');
+        const gameOver = document.getElementById('gameOver');
+        const finalScore = document.getElementById('finalScore');
+        const finalMoves = document.getElementById('finalMoves');
+        const finalTime = document.getElementById('finalTime');
+        const finalScoreValue = document.getElementById('finalScoreValue');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultMessage = document.getElementById('resultMessage');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+        const closeGameBtn = document.getElementById('closeGameBtn');
+        const soundToggle = document.getElementById('soundToggle');
+        const bestMovesElement = document.getElementById('bestMoves');
+        const winsElement = document.getElementById('wins');
+        const difficultyButtons = document.querySelectorAll('.difficulty-btn');
+        
+        // Начальные значения
+        bestMovesElement.textContent = bestMoves;
+        winsElement.textContent = wins;
+        
+        // Выбор уровня сложности
+        difficultyButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                difficultyButtons.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                difficulty = this.dataset.level;
+                
+                if (difficulty === 'easy') totalPairs = 4;
+                else if (difficulty === 'medium') totalPairs = 6;
+                else totalPairs = 8;
+                
+                if (gameActive) {
+                    resetGame();
+                    startGame();
+                }
+            });
+        });
+        
+        // Начать игру
+        startBtn.addEventListener('click', startGame);
+        
+        // Начать заново
+        restartBtn.addEventListener('click', function() {
+            resetGame();
+            startGame();
+        });
+        
+        // Включить/выключить звук
+        soundToggle.addEventListener('click', function() {
+            soundEnabled = !soundEnabled;
+            this.textContent = soundEnabled ? '🔈' : '🔇';
+            this.style.color = soundEnabled ? '#4CAF50' : '#757575';
+        });
+        
+        // Кнопка помощи
+        hintBtn.addEventListener('click', showHint);
+        
+        // Управление экраном окончания игры
+        playAgainBtn.addEventListener('click', function() {
+            gameOver.style.display = 'none';
+            resetGame();
+            startGame();
+        });
+        
+        closeGameBtn.addEventListener('click', function() {
+            gameOver.style.display = 'none';
+        });
+        
+        // Функция начала игры
+        function startGame() {
+            if (gameActive) return;
+            
+            gameActive = true;
+            canFlip = true;
+            moves = 0;
+            score = 0;
+            matchedPairs = 0;
+            
+            // Настройка времени
+            if (difficulty === 'easy') timer = 90;
+            else if (difficulty === 'medium') timer = 120;
+            else timer = 150;
+            
+            movesElement.textContent = moves;
+            timerElement.textContent = timer;
+            scoreElement.textContent = score;
+            
+            startBtn.disabled = true;
+            restartBtn.disabled = false;
+            hintBtn.disabled = false;
+            
+            createGameGrid();
+            startTimer();
+            
+            // Обновление общего количества игр
+            totalGames++;
+            localStorage.setItem('farmGame_totalGames', totalGames);
+            document.getElementById('totalGames').textContent = totalGames;
+        }
+        
+        // Создание игровой сетки
+        function createGameGrid() {
+            gameGrid.innerHTML = '';
+            
+            let emojis = [...farmEmojis[difficulty]];
+            emojis = shuffleArray(emojis);
+            
+            emojis.forEach(emoji => {
+                const card = document.createElement('div');
+                card.className = 'game-card-item';
+                card.dataset.emoji = emoji;
+                
+                const cardFront = document.createElement('div');
+                cardFront.className = 'card-front';
+                cardFront.textContent = '❓';
+                
+                const cardBack = document.createElement('div');
+                cardBack.className = 'card-back';
+                cardBack.textContent = emoji;
+                
+                card.appendChild(cardFront);
+                card.appendChild(cardBack);
+                
+                card.addEventListener('click', () => flipCard(card));
+                gameGrid.appendChild(card);
+            });
+            
+            if (difficulty === 'easy') {
+                gameGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+                gameGrid.style.maxWidth = '600px';
+            } else if (difficulty === 'medium') {
+                gameGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+                gameGrid.style.maxWidth = '800px';
+            } else {
+                gameGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+                gameGrid.style.maxWidth = '800px';
+            }
+        }
+        
+        // Переворот карты
+        function flipCard(card) {
+            if (!gameActive || !canFlip || card.classList.contains('flipped') || card.classList.contains('matched')) {
+                return;
+            }
+            
+            card.classList.add('flipped');
+            flippedCards.push(card);
+            
+            if (flippedCards.length === 2) {
+                canFlip = false;
+                moves++;
+                movesElement.textContent = moves;
+                
+                checkForMatch();
+            }
+        }
+        
+        // Проверка на совпадение
+        function checkForMatch() {
+            const [card1, card2] = flippedCards;
+            
+            if (card1.dataset.emoji === card2.dataset.emoji) {
+                setTimeout(() => {
+                    card1.classList.add('matched');
+                    card2.classList.add('matched');
+                    
+                    matchedPairs++;
+                    score += 20;
+                    scoreElement.textContent = score;
+                    
+                    flippedCards = [];
+                    canFlip = true;
+                    
+                    if (matchedPairs === totalPairs) {
+                        endGame(true);
+                    }
+                }, 500);
+            } else {
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                    
+                    flippedCards = [];
+                    canFlip = true;
+                    
+                    score = Math.max(0, score - 5);
+                    scoreElement.textContent = score;
+                }, 1000);
+            }
+        }
+        
+        // Запуск таймера
+        function startTimer() {
+            clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                timer--;
+                timerElement.textContent = timer;
+                
+                if (timer <= 0) {
+                    endGame(false);
+                }
+            }, 1000);
+        }
+        
+        // Показать подсказку
+        function showHint() {
+            if (!gameActive) return;
+            
+            const cards = document.querySelectorAll('.game-card-item:not(.matched)');
+            const unmatchedCards = Array.from(cards).filter(card => !card.classList.contains('flipped'));
+            
+            if (unmatchedCards.length >= 2) {
+                const randomIndex = Math.floor(Math.random() * (unmatchedCards.length / 2)) * 2;
+                const card1 = unmatchedCards[randomIndex];
+                const card2 = unmatchedCards.find(card => 
+                    card !== card1 && 
+                    card.dataset.emoji === card1.dataset.emoji
+                );
+                
+                if (card1 && card2) {
+                    card1.classList.add('flipped');
+                    card2.classList.add('flipped');
+                    
+                    setTimeout(() => {
+                        card1.classList.remove('flipped');
+                        card2.classList.remove('flipped');
+                    }, 1000);
+                    
+                    score = Math.max(0, score - 10);
+                    scoreElement.textContent = score;
+                }
+            }
+        }
+        
+        // Завершение игры
+        function endGame(isWin) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            
+            let finalScoreValue = score;
+            if (isWin) {
+                finalScoreValue += timer * 5;
+            }
+            
+            // Обновление достижений
+            if (isWin) {
+                wins++;
+                localStorage.setItem('farmGame_wins', wins);
+                winsElement.textContent = wins;
+                document.getElementById('totalWins').textContent = wins;
+                
+                if (bestMoves === 0 || moves < bestMoves) {
+                    bestMoves = moves;
+                    localStorage.setItem('farmGame_bestMoves', bestMoves);
+                    bestMovesElement.textContent = bestMoves;
+                }
+                
+                if (finalScoreValue > bestScore) {
+                    bestScore = finalScoreValue;
+                    localStorage.setItem('farmGame_bestScore', bestScore);
+                    document.getElementById('bestScore').textContent = bestScore;
+                }
+                
+                const currentTime = difficulty === 'easy' ? 90 - timer : 
+                                   difficulty === 'medium' ? 120 - timer : 
+                                   150 - timer;
+                
+                if (!bestTime || currentTime < bestTime) {
+                    bestTime = currentTime;
+                    localStorage.setItem('farmGame_bestTime', bestTime);
+                    document.getElementById('bestTime').textContent = bestTime + ' сек';
+                }
+            }
+            
+            // Показать результаты
+            if (isWin) {
+                resultTitle.textContent = 'Поздравляем! 🏆';
+                resultMessage.textContent = `Вы нашли все ${totalPairs} пар за ${moves} ходов!`;
+            } else {
+                resultTitle.textContent = 'Время вышло! ⏰';
+                resultMessage.textContent = `Вы нашли ${matchedPairs}/${totalPairs} пар. В следующий раз попробуйте еще раз!`;
+            }
+
+            
+            finalScore.textContent = `${finalScoreValue} очков`;
+            finalMoves.textContent = moves;
+            finalTime.textContent = difficulty === 'easy' ? 90 - timer : 
+                                   difficulty === 'medium' ? 120 - timer : 
+                                   150 - timer;
+            finalScoreValue.textContent = finalScoreValue;
+            
+            gameOver.style.display = 'flex';
+        }
+        
+        // Сброс игры
+        function resetGame() {
+            gameActive = false;
+            canFlip = true;
+            moves = 0;
+            score = 0;
+            matchedPairs = 0;
+            flippedCards = [];
+            
+            clearInterval(timerInterval);
+            
+            movesElement.textContent = moves;
+            scoreElement.textContent = score;
+            
+            startBtn.disabled = false;
+            restartBtn.disabled = true;
+            hintBtn.disabled = true;
+            
+            gameGrid.innerHTML = '';
+        }
+        
+        // Перемешивание массива
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+        
+        // Создание начальной игровой сетки
+        createGameGrid();
+    }
+    
+    function loadGameStats() {
+        // Получение статистики из localStorage
+        const totalWins = localStorage.getItem('farmGame_wins') || 0;
+        const bestScore = localStorage.getItem('farmGame_bestScore') || 0;
+        const bestTime = localStorage.getItem('farmGame_bestTime');
+        const totalGames = localStorage.getItem('farmGame_totalGames') || 0;
+        
+        document.getElementById('totalWins').textContent = totalWins;
+        document.getElementById('bestScore').textContent = bestScore;
+        document.getElementById('bestTime').textContent = bestTime ? bestTime + ' сек' : '-';
+        document.getElementById('totalGames').textContent = totalGames;
+    }
+</script>
+{% endblock %}

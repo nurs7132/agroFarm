@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-tachometer-alt me-2"></i>Панель управления</h1>
+    <span class="badge bg-primary fs-6">Сегодня: {{ now.strftime('%d.%m.%Y') if now else '' }}</span>
+</div>
+
+<!-- Статистика -->
+<div class="row">
+    <div class="col-md-3">
+        <div class="stat-card bg-primary">
+            <i class="fas fa-cow fa-3x mb-3"></i>
+            <h3>{{ animal_count }}</h3>
+            <p>Всего животных</p>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card bg-success">
+            <i class="fas fa-weight-hanging fa-3x mb-3"></i>
+            <h3>{{ ready_count }}</h3>
+            <p>Готовы к забою</p>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card bg-info">
+            <i class="fas fa-tractor fa-3x mb-3"></i>
+            <h3>{{ field_count }}</h3>
+            <p>Активных полей</p>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card bg-warning">
+            <i class="fas fa-tasks fa-3x mb-3"></i>
+            <h3>{{ task_count }}</h3>
+            <p>Текущих задач</p>
+        </div>
+    </div>
+</div>
+
+<!-- Финансовая статистика ТОЛЬКО для admin и manager -->
+{% if session.role in ['admin', 'manager'] %}
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="stat-card bg-success">
+            <i class="fas fa-money-bill-wave fa-3x mb-3"></i>
+            <h3>{{ "%.0f"|format(total_income) }} ₸</h3>
+            <p>Общий доход</p>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card bg-danger">
+            <i class="fas fa-receipt fa-3x mb-3"></i>
+            <h3>{{ "%.0f"|format(total_expense) }} ₸</h3>
+            <p>Общий расход</p>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card {% if balance >= 0 %}bg-info{% else %}bg-warning{% endif %}">
+            <i class="fas fa-balance-scale fa-3x mb-3"></i>
+            <h3>{{ "%.0f"|format(balance) }} ₸</h3>
+            <p>Баланс</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Быстрые действия -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Быстрые действия</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('animals') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-plus me-2"></i>Добавить животное
+                    </a>
+                    
+                    {% if session.role in ['admin', 'manager'] %}
+                    <a href="{{ url_for('finance') }}" class="btn btn-outline-success">
+                        <i class="fas fa-money-bill me-2"></i>Добавить операцию
+                    </a>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('tasks') }}" class="btn btn-outline-info">
+                        <i class="fas fa-tasks me-2"></i>Создать задачу
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+      
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Ближайшие задачи</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_tasks %}
+                    <div class="list-group">
+                        {% for task in recent_tasks %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ task[0] }}</h6>
+                                <small>{{ task[1] }}</small>
+                            </div>
+                            <small class="text-muted">Назначено: {{ task[2] }}</small>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">Нет предстоящих задач</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- График статистики -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Статистика животных</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="animalChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// График для главной страницы
+fetch('/api/animal_stats')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('animalChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.breeds,
+                datasets: [{
+                    label: 'Количество животных',
+                    data: data.counts,
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }, {
+                    label: 'Средний вес (кг)',
+                    data: data.avg_weights,
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1,
+                    type: 'line',
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Количество'
+                        }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Вес (кг)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

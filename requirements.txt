@@ -1,0 +1,5 @@
+Flask==2.3.3
+psycopg2-binary==2.9.9  # Измените эту строку
+Werkzeug==2.3.7
+python-telegram-bot==20.7  # Добавьте для бота
+requests==2.31.0  # Добавьте для API

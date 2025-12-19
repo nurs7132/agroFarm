@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-money-bill me-2"></i>Финансовый учет</h1>
+    <div>
+        <!-- Кнопки экспорта/импорта -->
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-download me-2"></i>Экспорт
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='finance', format_type='excel') }}">
+                    <i class="fas fa-file-excel text-success me-2"></i>Excel (.xlsx)
+                </a></li>
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='finance', format_type='csv') }}">
+                    <i class="fas fa-file-csv text-primary me-2"></i>CSV (.csv)
+                </a></li>
+            </ul>
+        </div>
+
+        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#importModalFinance">
+            <i class="fas fa-upload me-2"></i>Импорт
+        </button>
+        
+        {% if session.role in ['admin', 'manager'] %}
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addFinanceModal">
+            <i class="fas fa-plus me-2"></i>Добавить операцию
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+
+<!-- Финансовая статистика -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="stat-card bg-success">
+            <i class="fas fa-arrow-down fa-3x mb-3"></i>
+            <h3>{{ "%.2f"|format(total_income) }} ₸</h3>
+            <p>Общий доход</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card bg-danger">
+            <i class="fas fa-arrow-up fa-3x mb-3"></i>
+            <h3>{{ "%.2f"|format(total_expense) }} ₸</h3>
+            <p>Общий расход</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card {% if balance >= 0 %}bg-info{% else %}bg-warning{% endif %}">
+            <i class="fas fa-balance-scale fa-3x mb-3"></i>
+            <h3>{{ "%.2f"|format(balance) }} ₸</h3>
+            <p>Баланс</p>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика по категориям -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-white">
+        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Статистика по категориям</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for stat in category_stats %}
+            <div class="col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">{{ stat[0] }}</h6>
+                        <span class="badge {% if stat[1] == 'доход' %}bg-success{% else %}bg-danger{% endif %} mb-2">
+                            {{ stat[1] }}
+                        </span>
+                        <h4 class="text-primary">{{ "%.2f"|format(stat[2]) }} ₸</h4>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Таблица финансов -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Финансовые операции</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Описание</th>
+                        <th>Тип</th>
+                        <th>Категория</th>
+                        <th>Сумма</th>
+                        <th>Дата</th>
+                        <th>Кто добавил</th>
+                        {% if session.role in ['admin', 'manager'] %}
+                        <th>Действия</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for operation in finance %}
+                    <tr>
+                        <td>{{ operation[5] }}</td>
+                        <td>
+                            <span class="badge {% if operation[1] == 'доход' %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ operation[1] }}
+                            </span>
+                        </td>
+                        <td>{{ operation[2] }}</td>
+                        <td><strong>{{ "%.2f"|format(operation[3]) }} ₸</strong></td>
+                        <td>{{ operation[4] or '-' }}</td>
+                        <td>
+                            {% if operation[7] %}
+                                {{ operation[7] }}
+                                {% if session.role in ['admin', 'manager'] %}
+                                    <br><small class="text-muted">ID: {{ operation[6] }}</small>
+                                {% endif %}
+                            {% else %}
+                                Система
+                            {% endif %}
+                        </td>
+                        {% if session.role in ['admin', 'manager'] %}
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('edit_finance', finance_id=operation[0]) }}" 
+                                   class="btn btn-outline-warning btn-sm" 
+                                   title="Редактировать">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% if session.role in ['admin', 'manager'] %}
+                                <form method="POST" 
+                                      action="{{ url_for('delete_finance', finance_id=operation[0]) }}" 
+                                      class="d-inline"
+                                      onsubmit="return confirm('Удалить эту финансовую операцию?');">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Удалить">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления операции -->
+{% if session.role in ['admin', 'manager'] %}
+<div class="modal fade" id="addFinanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить финансовую операцию</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_finance') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Тип операции:</label>
+                        <select name="type" class="form-control" required>
+                            <option value="">Выберите тип</option>
+                            <option value="доход">Доход</option>
+                            <option value="расход">Расход</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Категория:</label>
+                        <input type="text" name="category" class="form-control" placeholder="Например: корм, топливо, продажа мяса" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Сумма (₸):</label>
+                        <input type="number" step="0.01" name="amount" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата:</label>
+                        <input type="date" name="date" class="form-control" required value="{{ now.strftime('%Y-%m-%d') if now else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание:</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Подробное описание операции"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Добавить операцию</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- Раздел с диаграммами -->
+<div class="card mt-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Визуальная статистика</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <!-- Диаграмма доходов по категориям -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">Доходы по категориям</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="incomeChart" width="400" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Диаграмма расходов по категориям -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h6 class="mb-0">Расходы по категориям</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="expenseChart" width="400" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- График доходов и расходов по месяцам -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">Динамика доходов и расходов (последние 6 месяцев)</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="monthlyChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Функция для генерации случайных цветов
+function generateColors(count) {
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+        const hue = (i * 137.5) % 360; // Золотой угол для равномерного распределения
+        colors.push(`hsl(${hue}, 70%, 60%)`);
+    }
+    return colors;
+}
+
+// Загружаем данные и строим диаграммы
+fetch('/api/finance_charts')
+    .then(response => response.json())
+    .then(data => {
+        // Диаграмма доходов по категориям
+        const incomeCtx = document.getElementById('incomeChart').getContext('2d');
+        if (data.income.categories.length > 0) {
+            new Chart(incomeCtx, {
+                type: 'pie',
+                data: {
+                    labels: data.income.categories,
+                    datasets: [{
+                        data: data.income.amounts,
+                        backgroundColor: generateColors(data.income.categories.length),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value.toLocaleString('ru-RU')} ₸ (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            incomeCtx.font = '16px Arial';
+            incomeCtx.fillStyle = '#999';
+            incomeCtx.textAlign = 'center';
+            incomeCtx.fillText('Нет данных о доходах', 200, 150);
+        }
+
+        // Диаграмма расходов по категориям
+        const expenseCtx = document.getElementById('expenseChart').getContext('2d');
+        if (data.expense.categories.length > 0) {
+            new Chart(expenseCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.expense.categories,
+                    datasets: [{
+                        data: data.expense.amounts,
+                        backgroundColor: generateColors(data.expense.categories.length),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value.toLocaleString('ru-RU')} ₸ (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            expenseCtx.font = '16px Arial';
+            expenseCtx.fillStyle = '#999';
+            expenseCtx.textAlign = 'center';
+            expenseCtx.fillText('Нет данных о расходах', 200, 150);
+        }
+
+        // График доходов и расходов по месяцам
+        const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+        if (data.monthly.months.length > 0) {
+            new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.monthly.months,
+                    datasets: [
+                        {
+                            label: 'Доходы',
+                            data: data.monthly.income,
+                            backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Расходы',
+                            data: data.monthly.expense,
+                            backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                            borderColor: 'rgba(220, 53, 69, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('ru-RU') + ' ₸';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.raw.toLocaleString('ru-RU')} ₸`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            monthlyCtx.font = '16px Arial';
+            monthlyCtx.fillStyle = '#999';
+            monthlyCtx.textAlign = 'center';
+            monthlyCtx.fillText('Нет данных за последние 6 месяцев', 200, 100);
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка загрузки данных для диаграмм:', error);
+    });
+</script>
+{% endblock %}

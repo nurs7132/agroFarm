@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-tools me-2"></i>Управление техникой</h1>
+    <div>
+        <!-- Кнопки экспорта/импорта -->
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-download me-2"></i>Экспорт
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='machinery', format_type='excel') }}">
+                    <i class="fas fa-file-excel text-success me-2"></i>Excel (.xlsx)
+                </a></li>
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='machinery', format_type='csv') }}">
+                    <i class="fas fa-file-csv text-primary me-2"></i>CSV (.csv)
+                </a></li>
+            </ul>
+        </div>
+
+        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#importModalMachinery">
+            <i class="fas fa-upload me-2"></i>Импорт
+        </button>
+        
+        {% if session.role in ['admin', 'manager'] %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMachineModal">
+            <i class="fas fa-plus me-2"></i>Добавить технику
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Карточки техники -->
+<div class="row">
+    {% for machine in machinery %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            {% if machine[9] %}  {# photo #}
+            <img src="{{ url_for('static', filename='uploads/' + machine[9]) }}" 
+                 class="card-img-top" 
+                 style="height: 200px; object-fit: cover; cursor: pointer;"
+                 alt="{{ machine[2] }}"
+                 data-bs-toggle="modal" 
+                 data-bs-target="#photoModal{{ machine[0] }}">
+            {% else %}
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
+                 style="height: 200px;">
+                <i class="fas fa-tractor fa-3x text-muted"></i>
+            </div>
+            {% endif %}
+            
+            <div class="card-header 
+                {% if machine[5] == 'исправна' %}bg-success
+                {% elif machine[5] == 'требует ремонта' %}bg-danger
+                {% else %}bg-warning{% endif %} text-white">
+                <h5 class="mb-0">{{ machine[2] }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Тип:</strong><br>
+                        {{ machine[1] }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Серийный номер:</strong><br>
+                        {{ machine[3] or 'Не указан' }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Покупка:</strong><br>
+                        {{ machine[4] or 'Не указана' }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Состояние:</strong><br>
+                        <span class="badge 
+                            {% if machine[5] == 'исправна' %}bg-success
+                            {% elif machine[5] == 'требует ремонта' %}bg-danger
+                            {% else %}bg-warning{% endif %}">
+                            {{ machine[5] }}
+                        </span>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6">
+                        <strong>Последнее ТО:</strong><br>
+                        {{ machine[6] or 'Не указано' }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Следующее ТО:</strong><br>
+                        {{ machine[7] or 'Не указано' }}
+                    </div>
+                </div>
+                {% if machine[8] %}  {# service_notes #}
+                <div class="mt-2">
+                    <strong>Примечания:</strong><br>
+                    <small class="text-muted">{{ machine[8] }}</small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <div class="btn-group w-100">
+                    <!-- Кнопка редактирования (только для admin и manager) -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <button class="btn btn-outline-warning btn-sm" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#editMachineModal{{ machine[0] }}">
+                        <i class="fas fa-edit"></i> Изменить
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Кнопки состояния и ТО (для всех) -->
+                    <button class="btn btn-outline-info btn-sm" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#conditionModal{{ machine[0] }}">
+                        <i class="fas fa-cogs"></i> Состояние
+                    </button>
+                    
+                    <button class="btn btn-outline-primary btn-sm" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#serviceModal{{ machine[0] }}">
+                        <i class="fas fa-calendar"></i> ТО
+                    </button>
+                    
+                    <!-- Кнопка удаления (только для admin и manager) -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <form method="POST" 
+                          action="{{ url_for('delete_machine', machine_id=machine[0]) }}" 
+                          class="d-inline"
+                          onsubmit="return confirm('Удалить технику {{ machine[2] }}?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для просмотра фото -->
+    {% if machine[9] %}
+    <div class="modal fade" id="photoModal{{ machine[0] }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Фото техники: {{ machine[2] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="{{ url_for('static', filename='uploads/' + machine[9]) }}" 
+                         class="img-fluid" 
+                         style="max-height: 70vh; object-fit: contain;"
+                         alt="{{ machine[2] }}">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Модальное окно редактирования техники (только для admin и manager) -->
+    {% if session.role in ['admin', 'manager'] %}
+    <div class="modal fade" id="editMachineModal{{ machine[0] }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактирование: {{ machine[2] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" 
+                      action="{{ url_for('edit_machine', machine_id=machine[0]) }}" 
+                      enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Тип техники:</label>
+                            <input type="text" name="type" class="form-control" value="{{ machine[1] }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Модель:</label>
+                            <input type="text" name="model" class="form-control" value="{{ machine[2] }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Серийный номер:</label>
+                            <input type="text" name="serial_number" class="form-control" value="{{ machine[3] or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата покупки:</label>
+                            <input type="date" name="purchase_date" class="form-control" value="{{ machine[4] or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Состояние:</label>
+                            <select name="condition" class="form-control" required>
+                                <option value="исправна" {% if machine[5] == 'исправна' %}selected{% endif %}>Исправна</option>
+                                <option value="требует ремонта" {% if machine[5] == 'требует ремонта' %}selected{% endif %}>Требует ремонта</option>
+                                <option value="в ремонте" {% if machine[5] == 'в ремонте' %}selected{% endif %}>В ремонте</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Примечания по состоянию:</label>
+                            <textarea name="service_notes" class="form-control" rows="3">{{ machine[8] or '' }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Фото техники:</label>
+                            <input type="file" name="photo" class="form-control" accept="image/*">
+                            {% if machine[9] %}
+                            <div class="mt-2">
+                                <small class="text-muted">Текущее фото:</small><br>
+                                <img src="{{ url_for('static', filename='uploads/' + machine[9]) }}" 
+                                     style="max-width: 100px; max-height: 100px; object-fit: cover; border-radius: 5px;">
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Модальное окно изменения состояния (для всех) -->
+    <div class="modal fade" id="conditionModal{{ machine[0] }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Изменение состояния: {{ machine[2] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" 
+                      action="{{ url_for('update_machine_condition', machine_id=machine[0]) }}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Состояние:</label>
+                            <select name="condition" class="form-control" required>
+                                <option value="исправна" {% if machine[5] == 'исправна' %}selected{% endif %}>Исправна</option>
+                                <option value="требует ремонта" {% if machine[5] == 'требует ремонта' %}selected{% endif %}>Требует ремонта</option>
+                                <option value="в ремонте" {% if machine[5] == 'в ремонте' %}selected{% endif %}>В ремонте</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Комментарий о состоянии:</label>
+                            <textarea name="service_notes" class="form-control" rows="3" 
+                                      placeholder="Опишите что именно сломалось или требует ремонта...">{{ machine[8] or '' }}</textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-warning">Обновить состояние</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно обновления ТО (для всех) -->
+    <div class="modal fade" id="serviceModal{{ machine[0] }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Техническое обслуживание: {{ machine[2] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" 
+                      action="{{ url_for('update_service_dates', machine_id=machine[0]) }}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Дата последнего ТО:</label>
+                            <input type="date" name="last_service_date" class="form-control" value="{{ machine[6] or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата следующего ТО:</label>
+                            <input type="date" name="next_service_date" class="form-control" value="{{ machine[7] or '' }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Обновить даты ТО</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Модальное окно добавления техники (только для admin и manager) -->
+{% if session.role in ['admin', 'manager'] %}
+<div class="modal fade" id="addMachineModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить новую технику</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_machine') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Тип техники:</label>
+                        <input type="text" name="type" class="form-control" placeholder="Например: трактор, комбайн" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Модель:</label>
+                        <input type="text" name="model" class="form-control" placeholder="Например: Беларус-82" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Серийный номер:</label>
+                        <input type="text" name="serial_number" class="form-control" placeholder="Необязательно">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата покупки:</label>
+                        <input type="date" name="purchase_date" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Состояние:</label>
+                        <select name="condition" class="form-control" required>
+                            <option value="исправна">Исправна</option>
+                            <option value="требует ремонта">Требует ремонта</option>
+                            <option value="в ремонте">В ремонте</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата последнего ТО:</label>
+                        <input type="date" name="last_service_date" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата следующего ТО:</label>
+                        <input type="date" name="next_service_date" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Примечания по состоянию:</label>
+                        <textarea name="service_notes" class="form-control" rows="3" placeholder="Комментарии о состоянии, неисправностях и т.д."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Фото техники:</label>
+                        <input type="file" name="photo" class="form-control" accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Добавить технику</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

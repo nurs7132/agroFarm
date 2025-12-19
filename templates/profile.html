@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-user me-2"></i>Мой профиль</h1>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>На главную
+        </a>
+    </div>
+    
+    <div class="row">
+        <!-- Левая колонка - информация -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-id-card me-2"></i>Личная информация</h5>
+                </div>
+                <div class="card-body text-center">
+                    <!-- Фото профиля -->
+                    <div class="mb-4">
+                        {% if user[7] %}
+                            <img src="{{ url_for('static', filename='uploads/' + user[7]) }}"
+                                 class="img-fluid rounded-circle mb-3 shadow"
+                                 style="width: 180px; height: 180px; object-fit: cover; border: 5px solid #3498db;"
+                                 alt="Фото профиля"
+                                 data-bs-toggle="modal"
+                                 data-bs-target="#photoModal">
+                            <br>
+                            <form method="POST" action="{{ url_for('delete_profile_photo') }}"
+                                  onsubmit="return confirm('Удалить фото профиля?');"
+                                  class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-trash me-1"></i>Удалить фото
+                                </button>
+                            </form>
+                        {% else %}
+                            <div class="mb-3">
+                                <i class="fas fa-user-circle" style="font-size: 8rem; color: #6c757d;"></i>
+                                <br>
+                                <span class="text-muted">Фото не установлено</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <h4 class="mb-2">{{ user[5] or 'Не указано' }}</h4>
+                    <p class="text-muted mb-3">@{{ user[1] }}</p>
+                    
+                    <div class="badge
+                        {% if user[2] == 'admin' %}bg-danger
+                        {% elif user[2] == 'manager' %}bg-warning
+                        {% else %}bg-info{% endif %}
+                        mb-3 p-2" style="font-size: 1rem">
+                        <i class="fas fa-shield-alt me-1"></i>{{ user[2] }}
+                    </div>
+                </div>
+                
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <i class="fas fa-envelope me-2 text-primary"></i>
+                        <strong>Email:</strong>
+                        <div class="mt-1">{{ user[3] or 'Не указан' }}</div>
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-phone me-2 text-primary"></i>
+                        <strong>Телефон:</strong>
+                        <div class="mt-1">{{ user[4] or 'Не указан' }}</div>
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-money-bill-wave me-2 text-primary"></i>
+                        <strong>Зарплата:</strong>
+                        <div class="mt-1">
+                            {% if user[2] == 'admin' %}
+                                <span class="text-muted">Не предусмотрена</span>
+                            {% elif user[6] %}
+                                <strong class="text-success">{{ user[6] }} ₸</strong>
+                            {% else %}
+                                <span class="text-muted">Не указана</span>
+                            {% endif %}
+                        </div>
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-calendar-alt me-2 text-primary"></i>
+                        <strong>Дата регистрации:</strong>
+                        <div class="mt-1">{{ user[8].strftime('%d.%m.%Y') }}</div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Правая колонка - редактирование -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-edit me-2"></i>Редактировать профиль</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_profile') }}" enctype="multipart/form-data" id="profileForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Логин:</strong></label>
+                                    <input type="text" name="username" class="form-control"
+                                           value="{{ user[1] }}" required>
+                                    <small class="text-muted">Имя для входа в систему</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>ФИО:</strong></label>
+                                    <input type="text" name="full_name" class="form-control"
+                                           value="{{ user[5] or '' }}">
+                                    <small class="text-muted">Ваше полное имя</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Email:</strong></label>
+                                    <input type="email" name="email" class="form-control"
+                                           value="{{ user[3] or '' }}">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Телефон:</strong></label>
+                                    <input type="tel" name="phone" class="form-control"
+                                           value="{{ user[4] or '' }}">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Новое фото профиля:</strong></label>
+                                    <input type="file" name="profile_photo"
+                                           class="form-control" accept="image/*"
+                                           id="photoInput">
+                                    <small class="text-muted">JPG, PNG, GIF (макс. 16MB)</small>
+                                    <div id="photoPreview" class="mt-2 text-center"></div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Новый пароль:</strong></label>
+                                    <input type="password" name="password"
+                                           class="form-control"
+                                           placeholder="Оставьте пустым, чтобы не менять">
+                                    <small class="text-muted">Минимум 6 символов</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Подтвердите пароль:</strong></label>
+                                    <input type="password" name="confirm_password"
+                                           class="form-control"
+                                           placeholder="Повторите новый пароль">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-success btn-lg w-100">
+                                <i class="fas fa-save me-2"></i>Сохранить изменения
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Информация о системе -->
+            <div class="card mt-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Системная информация</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-shield-alt me-2"></i>Ваши права доступа:</h5>
+                        <ul class="mb-0">
+                            {% if user[2] == 'admin' %}
+                                <li>Полный доступ ко всем разделам</li>
+                                <li>Управление пользователями</li>
+                                <li>Настройки системы</li>
+                            {% elif user[2] == 'manager' %}
+                                <li>Управление животными, финансами и задачами</li>
+                                <li>Просмотр отчетов</li>
+                                <li>Управление складом</li>
+                            {% else %}
+                                <li>Просмотр животных и полей</li>
+                                <li>Выполнение назначенных задач</li>
+                                <li>Обновление статусов</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    
+                    <div class="text-center mt-3">
+                        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#helpModal">
+                            <i class="fas fa-question-circle me-2"></i>Нужна помощь?
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для просмотра фото -->
+{% if user[7] %}
+<div class="modal fade" id="photoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Фото профиля: {{ user[5] or user[1] }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img src="{{ url_for('static', filename='uploads/' + user[7]) }}"
+                     class="img-fluid rounded"
+                     style="max-height: 70vh; object-fit: contain;"
+                     alt="Фото профиля">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Закрыть
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Модальное окно помощи -->
+<div class="modal fade" id="helpModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-question-circle me-2"></i>Помощь</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>Как обновить профиль:</h6>
+                <ul>
+                    <li>Измените данные в полях формы</li>
+                    <li>Для смены пароля заполните оба поля "Новый пароль"</li>
+                    <li>Для загрузки фото выберите файл в формате JPG, PNG или GIF</li>
+                    <li>Максимальный размер фото - 16MB</li>
+                </ul>
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Важно:</strong> После изменения логина вам нужно будет использовать его для входа в систему.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Предпросмотр фото перед загрузкой
+document.getElementById('photoInput').addEventListener('change', function(e) {
+    const preview = document.getElementById('photoPreview');
+    const file = e.target.files[0];
+    
+    if (file) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            preview.innerHTML = `
+                <div class="card">
+                    <div class="card-body text-center">
+                        <img src="${e.target.result}"
+                             class="img-fluid rounded"
+                             style="max-height: 200px; object-fit: cover;">
+                        <div class="mt-2">
+                            <small class="text-muted">Предпросмотр нового фото</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+        
+        reader.readAsDataURL(file);
+    } else {
+        preview.innerHTML = '';
+    }
+});
+</script>
+{% endblock %}

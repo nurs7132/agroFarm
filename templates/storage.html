@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-warehouse me-2"></i>Склад и учет кормов</h1>
+    <div>
+        <!-- Кнопки экспорта/импорта -->
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-download me-2"></i>Экспорт
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='storage', format_type='excel') }}">
+                    <i class="fas fa-file-excel text-success me-2"></i>Excel (.xlsx)
+                </a></li>
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='storage', format_type='csv') }}">
+                    <i class="fas fa-file-csv text-primary me-2"></i>CSV (.csv)
+                </a></li>
+            </ul>
+        </div>
+
+        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#importModalStorage">
+            <i class="fas fa-upload me-2"></i>Импорт
+        </button>
+        
+        <!-- Кнопка добавления типа корма (только для admin и manager) -->
+        {% if session.role in ['admin', 'manager'] %}
+        <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addFeedTypeModal">
+            <i class="fas fa-plus me-2"></i>Добавить тип корма
+        </button>
+        {% endif %}
+        
+        <!-- Кнопка списания корма (для manager и admin) -->
+        {% if session.role in ['admin', 'manager'] %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addConsumptionModal">
+            <i class="fas fa-minus-circle me-2"></i>Списать корм
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+
+<!-- Статистика животных -->
+<div class="row mb-4">
+    {% for animal in animals_by_species %}
+    <div class="col-md-3">
+        <div class="stat-card bg-info">
+            <i class="fas fa-{% if animal[0] == 'бычок' %}cow{% elif animal[0] == 'корова' %}cow{% else %}sheep{% endif %} fa-3x mb-3"></i>
+            <h3>{{ animal[1] }}</h3>
+            <p>{{ animal[0] }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Нормы кормления -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-white">
+        <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Нормы кормления животных в день</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Тип животного</th>
+                        <th>Тип корма</th>
+                        <th>Норма в день</th>
+                        <th>Примечания</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for norm in feeding_norms %}
+                    <tr>
+                        <td><strong>{{ norm[1] }}</strong></td>
+                        <td>
+                            {% if norm[2] == 'сено' %}
+                                <span class="badge bg-success">{{ norm[2] }}</span>
+                            {% elif norm[2] == 'зерновой корм' %}
+                                <span class="badge bg-warning">{{ norm[2] }}</span>
+                            {% else %}
+                                <span class="badge bg-info">{{ norm[2] }}</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ norm[3] }} {{ norm[4] }}</strong></td>
+                        <td><small class="text-muted">{{ norm[5] or '' }}</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Расчет потребления -->
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Расчет общего потребления в день</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for feed_type, consumption in total_daily_consumption.items() %}
+            <div class="col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">{{ feed_type }}</h5>
+                        <h3 class="text-primary">{{ "%.1f"|format(consumption) }} кг</h3>
+                        <small class="text-muted">в день</small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Склад -->
+<div class="card mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Остатки на складе</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Тип корма</th>
+                        <th>Категория</th>
+                        <th>Текущее количество</th>
+                        <th>Минимальный запас</th>
+                        <th>Единица измерения</th>
+                        <th>Цена за единицу</th>
+                        <th>Статус</th>
+                        {% if session.role in ['admin', 'manager'] %}
+                        <th>Действия</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in storage %}
+                    <tr>
+                        <td><strong>{{ item[1] }}</strong></td>
+                        <td>
+                            <span class="badge 
+                                {% if item[6] == 'сено' %}bg-success
+                                {% elif item[6] == 'зерновой корм' %}bg-warning
+                                {% else %}bg-info{% endif %}">
+                                {{ item[6] }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="{% if item[2] < item[4] %}text-danger fw-bold{% endif %}">
+                                {{ item[2] }} {{ item[3] }}
+                            </span>
+                        </td>
+                        <td>{{ item[4] }} {{ item[3] }}</td>
+                        <td>{{ item[3] }}</td>
+                        <td>{{ item[5] }} ₸</td>
+                        <td>
+                            {% if item[2] < item[4] %}
+                                <span class="badge bg-danger">Низкий запас</span>
+                            {% elif item[2] < item[4] * 2 %}
+                                <span class="badge bg-warning">Средний запас</span>
+                            {% else %}
+                                <span class="badge bg-success">Норма</span>
+                            {% endif %}
+                        </td>
+                        {% if session.role in ['admin', 'manager'] %}
+                        <td>
+                            <div class="btn-group">
+                                <!-- Кнопка изменения количества (для manager и admin) -->
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#updateStorageModal{{ loop.index }}">
+                                    <i class="fas fa-edit"></i> Кол-во
+                                </button>
+                                
+                                <!-- Кнопка редактирования типа корма (только для admin и manager) -->
+                                <button class="btn btn-sm btn-outline-warning" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#editFeedTypeModal{{ loop.index }}">
+                                    <i class="fas fa-cog"></i> Изменить
+                                </button>
+                                
+                                <!-- Кнопка удаления (только для admin) -->
+                                {% if session.role == 'admin' %}
+                                <form method="POST" 
+                                      action="{{ url_for('delete_feed_type', feed_id=item[0]) }}" 
+                                      class="d-inline"
+                                      onsubmit="return confirm('Удалить тип корма {{ item[1] }}?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+
+                    <!-- Модальное окно изменения количества -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <div class="modal fade" id="updateStorageModal{{ loop.index }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Изменение количества: {{ item[1] }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('update_storage') }}">
+                                    <div class="modal-body">
+                                        <input type="hidden" name="product_type" value="{{ item[1] }}">
+                                        <div class="mb-3">
+                                            <label class="form-label">Действие:</label>
+                                            <select name="operation" class="form-control" required>
+                                                <option value="add">Добавить к текущему количеству</option>
+                                                <option value="set">Установить новое количество</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Количество ({{ item[3] }}):</label>
+                                            <input type="number" step="0.01" name="quantity" class="form-control" required>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                        <button type="submit" class="btn btn-primary">Обновить</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Модальное окно редактирования типа корма -->
+                    {% if session.role in ['admin', 'manager'] %}
+                    <div class="modal fade" id="editFeedTypeModal{{ loop.index }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Редактирование типа корма: {{ item[1] }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('edit_feed_type', feed_id=item[0]) }}">
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Тип корма:</label>
+                                            <input type="text" name="product_type" class="form-control" value="{{ item[1] }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Категория:</label>
+                                            <select name="feed_category" class="form-control" required>
+                                                <option value="сено" {% if item[6] == 'сено' %}selected{% endif %}>Сено</option>
+                                                <option value="зерновой корм" {% if item[6] == 'зерновой корм' %}selected{% endif %}>Зерновой корм</option>
+                                                <option value="комбикорм" {% if item[6] == 'комбикорм' %}selected{% endif %}>Комбикорм</option>
+                                                <option value="другое">Другое</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Единица измерения:</label>
+                                            <select name="unit" class="form-control" required>
+                                                <option value="кг" {% if item[3] == 'кг' %}selected{% endif %}>Килограммы (кг)</option>
+                                                <option value="т" {% if item[3] == 'т' %}selected{% endif %}>Тонны (т)</option>
+                                                <option value="шт" {% if item[3] == 'шт' %}selected{% endif %}>Штуки (шт)</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Минимальный запас:</label>
+                                            <input type="number" step="0.01" name="min_quantity" class="form-control" value="{{ item[4] }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Цена за единицу (₸):</label>
+                                            <input type="number" step="0.01" name="price_per_unit" class="form-control" value="{{ item[5] or 0 }}">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                        <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления типа корма (только для admin и manager) -->
+{% if session.role in ['admin', 'manager'] %}
+<div class="modal fade" id="addFeedTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить новый тип корма</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_feed_type') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Тип корма:</label>
+                        <input type="text" name="product_type" class="form-control" placeholder="Например: овес, силос, жмых" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Категория:</label>
+                        <select name="feed_category" class="form-control" required>
+                            <option value="сено">Сено</option>
+                            <option value="зерновой корм">Зерновой корм</option>
+                            <option value="комбикорм">Комбикорм</option>
+                            <option value="другое">Другое</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Единица измерения:</label>
+                        <select name="unit" class="form-control" required>
+                            <option value="кг">Килограммы (кг)</option>
+                            <option value="т">Тонны (т)</option>
+                            <option value="шт">Штуки (шт)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Минимальный запас:</label>
+                        <input type="number" step="0.01" name="min_quantity" class="form-control" value="100" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Цена за единицу (₸):</label>
+                        <input type="number" step="0.01" name="price_per_unit" class="form-control" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Добавить тип корма</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Модальное окно списания корма -->
+{% if session.role in ['admin', 'manager'] %}
+<div class="modal fade" id="addConsumptionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Списание корма</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_feed_consumption') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Тип корма:</label>
+                        <select name="product_type" class="form-control" required>
+                            <option value="">Выберите корм</option>
+                            {% for item in storage %}
+                            <option value="{{ item[1] }}">{{ item[1] }} (остаток: {{ item[2] }} {{ item[3] }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Количество:</label>
+                        <input type="number" step="0.01" name="quantity" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Назначение:</label>
+                        <select name="purpose" class="form-control" required>
+                            <option value="для животных">Для животных</option>
+                            <option value="продажа">Продажа</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата списания:</label>
+                        <input type="date" name="consumption_date" class="form-control" required 
+                               value="{{ now.strftime('%Y-%m-%d') if now else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Примечания:</label>
+                        <textarea name="notes" class="form-control" rows="3" placeholder="Дополнительная информация"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Списать корм</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

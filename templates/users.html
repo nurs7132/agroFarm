@@ -1,0 +1,697 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2"><i class="fas fa-users me-2"></i>Команда фермы</h1>
+            <p class="text-muted mb-0">Управление сотрудниками и их профилями</p>
+        </div>
+        <div>
+            <!-- Кнопки экспорта/импорта -->
+            <div class="btn-group me-2">
+                <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-download me-2"></i>Экспорт
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='users', format_type='excel') }}">
+                        <i class="fas fa-file-excel text-success me-2"></i>Excel (.xlsx)
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='users', format_type='csv') }}">
+                        <i class="fas fa-file-csv text-primary me-2"></i>CSV (.csv)
+                    </a></li>
+                </ul>
+            </div>
+
+            <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#importModalUsers">
+                <i class="fas fa-upload me-2"></i>Импорт
+            </button>
+            
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="fas fa-user-plus me-2"></i>Добавить сотрудника
+            </button>
+        </div>
+    </div>
+
+    <!-- Фильтры ролей -->
+    <div class="card mb-4">
+        <div class="card-body py-3">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('users') }}" 
+                           class="btn btn-outline-secondary {% if not request.args.get('role') %}active{% endif %}">
+                            Все сотрудники
+                        </a>
+                        <a href="{{ url_for('users') }}?role=admin" 
+                           class="btn btn-outline-danger {% if request.args.get('role') == 'admin' %}active{% endif %}">
+                            <i class="fas fa-crown me-1"></i>Администраторы
+                        </a>
+                        <a href="{{ url_for('users') }}?role=manager" 
+                           class="btn btn-outline-warning {% if request.args.get('role') == 'manager' %}active{% endif %}">
+                            <i class="fas fa-user-tie me-1"></i>Менеджеры
+                        </a>
+                        <a href="{{ url_for('users') }}?role=worker" 
+                           class="btn btn-outline-info {% if request.args.get('role') == 'worker' %}active{% endif %}">
+                            <i class="fas fa-user-hard-hat me-1"></i>Рабочие
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Поиск по имени..." id="searchInput">
+                        <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Карточки сотрудников -->
+    <div class="row" id="usersGrid">
+        {% for user in users %}
+            {% if not request.args.get('role') or request.args.get('role') == user[2] %}
+<div class="col-xl-3 col-lg-4 col-md-6 mb-4 user-card" 
+     data-name="{{ user[5] or user[1] }}" 
+     data-role="{{ user[2] }}"
+     data-user-id="{{ user[0] }}">
+                <div class="card h-100 shadow-sm border-hover">
+                    <div class="card-header pt-4 pb-0 border-0 bg-transparent">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <!-- Фото профиля -->
+                            <div class="position-relative">
+                                {% if user[7] %}
+                                    <img src="{{ url_for('static', filename='uploads/' + user[7]) }}" 
+                                         class="rounded-circle user-avatar" 
+                                         alt="{{ user[5] or user[1] }}">
+                                {% else %}
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center user-avatar-default
+                                        {% if user[2] == 'admin' %}avatar-admin
+                                        {% elif user[2] == 'manager' %}avatar-manager
+                                        {% else %}avatar-worker{% endif %}">
+                                        <i class="fas fa-user fa-2x text-white"></i>
+                                    </div>
+                                {% endif %}
+                                
+                                <!-- Бейдж роли -->
+                                <span class="position-absolute top-0 start-100 translate-middle badge 
+                                    {% if user[2] == 'admin' %}bg-danger
+                                    {% elif user[2] == 'manager' %}bg-warning
+                                    {% else %}bg-info{% endif %} rounded-pill role-badge">
+                                    {{ user[2] }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body pt-3">
+                        <!-- Имя и должность -->
+                        <h5 class="card-title mb-1">{{ user[5] or 'Без имени' }}</h5>
+                        <p class="text-muted small mb-3">@{{ user[1] }}</p>
+                        
+                        <!-- Контактная информация -->
+                        <div class="mb-3">
+                            {% if user[3] %}
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-envelope text-primary me-2" style="width: 16px;"></i>
+                                <small class="text-truncate">{{ user[3] }}</small>
+                            </div>
+                            {% endif %}
+                            
+                            {% if user[4] %}
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-phone text-success me-2" style="width: 16px;"></i>
+                                <small>{{ user[4] }}</small>
+                            </div>
+                            {% endif %}
+                            
+                            {% if user[6] and user[2] != 'admin' %}
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-money-bill-wave text-success me-2" style="width: 16px;"></i>
+                                <small><strong>{{ user[6] }} ₸</strong></small>
+                            </div>
+                            {% elif user[2] == 'admin' %}
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-crown text-warning me-2" style="width: 16px;"></i>
+                                <small class="text-muted">Администратор</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Дата регистрации -->
+                        <div class="border-top pt-2">
+                            <small class="text-muted">
+                                <i class="far fa-calendar-alt me-1"></i>
+                                Присоединился: {{ user[8].strftime('%d.%m.%Y') }}
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Кнопки действий -->
+                    <div class="card-footer bg-light p-3">
+                        <div class="d-flex justify-content-between">
+                            <!-- Кнопка редактирования (видна всем) -->
+                            <button class="btn btn-outline-primary btn-sm" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editUserModal{{ user[0] }}">
+                                <i class="fas fa-edit me-1"></i>Редактировать
+                            </button>
+                            
+                            <!-- Кнопка удаления (только для других пользователей) -->
+                            {% if user[0] != session.user_id %}
+                            <button class="btn btn-outline-danger btn-sm" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#deleteUserModal{{ user[0] }}">
+                                <i class="fas fa-trash me-1"></i>Удалить
+                            </button>
+                            {% else %}
+                            <span class="badge bg-info align-self-center">
+                                <i class="fas fa-user me-1"></i>Это вы
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модальное окно редактирования пользователя -->
+            <div class="modal fade" id="editUserModal{{ user[0] }}" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Редактировать: {{ user[5] or user[1] }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="POST" action="{{ url_for('edit_user', user_id=user[0]) }}">
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Логин *</label>
+                                        <input type="text" name="username" class="form-control" 
+                                               value="{{ user[1] }}" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Роль *</label>
+                                        <select name="role" class="form-control" required 
+                                                onchange="toggleSalaryField('edit{{ user[0] }}')" 
+                                                id="roleSelectEdit{{ user[0] }}"
+                                                {% if user[0] == session.user_id %}disabled{% endif %}>
+                                            <option value="worker" {% if user[2] == 'worker' %}selected{% endif %}>Рабочий</option>
+                                            <option value="manager" {% if user[2] == 'manager' %}selected{% endif %}>Менеджер</option>
+                                            <option value="admin" {% if user[2] == 'admin' %}selected{% endif %}>Администратор</option>
+                                        </select>
+                                        {% if user[0] == session.user_id %}
+                                        <input type="hidden" name="role" value="{{ user[2] }}">
+                                        <small class="text-muted">Нельзя изменить свою роль</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">ФИО</label>
+                                    <input type="text" name="full_name" class="form-control" 
+                                           value="{{ user[5] or '' }}">
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" name="email" class="form-control" 
+                                               value="{{ user[3] or '' }}">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Телефон</label>
+                                        <input type="tel" name="phone" class="form-control" 
+                                               value="{{ user[4] or '' }}">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3" id="salaryFieldEdit{{ user[0] }}" 
+                                     {% if user[2] == 'admin' %}style="display: none;"{% endif %}>
+                                    <label class="form-label">Зарплата (₸)</label>
+                                    <input type="number" name="salary" class="form-control" 
+                                           value="{% if user[2] != 'admin' %}{{ user[6] or '' }}{% endif %}" 
+                                           placeholder="Введите зарплату">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Новый пароль</label>
+                                    <input type="password" name="password" class="form-control" 
+                                           placeholder="Оставьте пустым, чтобы не менять">
+                                    <small class="text-muted">Минимум 6 символов</small>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Поля отмеченные * обязательны для заполнения
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модальное окно подтверждения удаления (только для других пользователей) -->
+            {% if user[0] != session.user_id %}
+            <div class="modal fade" id="deleteUserModal{{ user[0] }}" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title">Подтверждение удаления</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="text-center mb-4">
+                                <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                                <h5>Вы уверены, что хотите удалить сотрудника?</h5>
+                            </div>
+                            
+                            <div class="alert alert-warning">
+                                <strong>Внимание!</strong> Это действие нельзя отменить. 
+                                Все данные пользователя будут удалены из системы.
+                            </div>
+                            
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        {% if user[7] %}
+                                            <img src="{{ url_for('static', filename='uploads/' + user[7]) }}" 
+                                                 class="rounded-circle me-3 user-avatar-small" 
+                                                 alt="{{ user[5] or user[1] }}">
+                                        {% else %}
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3 user-avatar-default-small
+                                                {% if user[2] == 'admin' %}avatar-admin
+                                                {% elif user[2] == 'manager' %}avatar-manager
+                                                {% else %}avatar-worker{% endif %}">
+                                                <i class="fas fa-user text-white"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <strong>{{ user[5] or user[1] }}</strong><br>
+                                            <small class="text-muted">@{{ user[1] }} • {{ user[2] }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                            <form method="POST" action="{{ url_for('delete_user', user_id=user[0]) }}" class="d-inline">
+                                <button type="submit" class="btn btn-danger">Да, удалить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    {% if users|length == 0 %}
+    <div class="text-center py-5">
+        <i class="fas fa-users fa-4x text-muted mb-4"></i>
+        <h3 class="text-muted">Сотрудники не найдены</h3>
+        <p class="text-muted">Добавьте первого сотрудника, нажав кнопку "Добавить сотрудника"</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Модальное окно добавления пользователя -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить нового сотрудника</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_user') }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Логин *</label>
+                            <input type="text" name="username" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Пароль *</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">ФИО</label>
+                        <input type="text" name="full_name" class="form-control">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Телефон</label>
+                            <input type="tel" name="phone" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Роль *</label>
+                        <select name="role" class="form-control" required 
+                                onchange="toggleSalaryField('add')" 
+                                id="roleSelectAdd">
+                            <option value="worker">Рабочий</option>
+                            <option value="manager">Менеджер</option>
+                            <option value="admin">Администратор</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="salaryFieldAdd">
+                        <label class="form-label">Зарплата (₸)</label>
+                        <input type="number" name="salary" class="form-control" 
+                               placeholder="Введите зарплату">
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Поля отмеченные * обязательны для заполнения
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Добавить сотрудника</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-0">{{ users|length }}</h2>
+                        <small>Всего сотрудников</small>
+                    </div>
+                    <i class="fas fa-users fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-0">{{ users|selectattr('2', 'equalto', 'admin')|list|length }}</h2>
+                        <small>Администраторов</small>
+                    </div>
+                    <i class="fas fa-crown fa-2x opacity-50"></i>
+                </div>
+            </div>
+</div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-0">{{ users|selectattr('2', 'equalto', 'manager')|list|length }}</h2>
+                        <small>Менеджеров</small>
+                    </div>
+                    <i class="fas fa-user-tie fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-0">{{ users|selectattr('2', 'equalto', 'worker')|list|length }}</h2>
+                        <small>Рабочих</small>
+                    </div>
+                    <i class="fas fa-user-hard-hat fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Переключение поля зарплаты
+function toggleSalaryField(type) {
+    if (type === 'add') {
+        const roleSelect = document.getElementById('roleSelectAdd');
+        const salaryField = document.getElementById('salaryFieldAdd');
+        
+        if (roleSelect.value === 'admin') {
+            salaryField.style.display = 'none';
+        } else {
+            salaryField.style.display = 'block';
+        }
+    } else {
+        const userId = type.replace('edit', '');
+        const roleSelect = document.getElementById('roleSelectEdit' + userId);
+        const salaryField = document.getElementById('salaryFieldEdit' + userId);
+        
+        if (roleSelect.value === 'admin') {
+            salaryField.style.display = 'none';
+        } else {
+            salaryField.style.display = 'block';
+        }
+    }
+}
+
+// Поиск сотрудников
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация полей зарплаты
+    toggleSalaryField('add');
+    
+    // Поиск
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.getElementById('searchButton');
+    const userCards = document.querySelectorAll('.user-card');
+    
+    function filterUsers() {
+        const searchTerm = searchInput.value.toLowerCase();
+        
+        userCards.forEach(card => {
+            const userName = card.getAttribute('data-name').toLowerCase();
+            const userRole = card.getAttribute('data-role');
+            const userId = card.getAttribute('data-id');
+            
+            // Проверяем соответствие фильтрам
+            const roleFilter = '{{ request.args.get("role", "") }}';
+            const matchesRole = !roleFilter || userRole === roleFilter;
+            const matchesSearch = !searchTerm || 
+                                 userName.includes(searchTerm) || 
+                                 userId.toString().includes(searchTerm);
+            
+            if (matchesRole && matchesSearch) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+    
+    searchInput.addEventListener('input', filterUsers);
+    searchButton.addEventListener('click', filterUsers);
+    
+    // Анимация карточек
+    userCards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+    
+    // Стили для карточек при наведении
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+            this.style.boxShadow = '0 10px 20px rgba(0,0,0,0.1)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = '';
+        });
+    });
+});
+</script>
+
+<style>
+.border-hover {
+    border: 1px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.border-hover:hover {
+    border-color: #3498db;
+}
+
+.card-header {
+    position: relative;
+    overflow: hidden;
+}
+
+.user-card {
+    animation: fadeInUp 0.5s ease forwards;
+    opacity: 0;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.role-badge {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+    transform: translate(-50%, -50%) !important;
+}
+
+/* Стили для аватарок */
+.user-avatar {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border: 4px solid #fff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.user-avatar-default {
+    width: 80px;
+    height: 80px;
+    border: 4px solid #fff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.user-avatar-small {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.user-avatar-default-small {
+    width: 50px;
+    height: 50px;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Цвета для аватарок по ролям */
+.avatar-admin {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+}
+
+.avatar-manager {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+}
+
+.avatar-worker {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+}
+
+/* Улучшенные стили карточек */
+.card {
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border-top: 4px solid #3498db;
+}
+
+[data-role="admin"] .card {
+    border-top-color: #dc3545;
+}
+
+[data-role="manager"] .card {
+    border-top-color: #ffc107;
+}
+
+[data-role="worker"] .card {
+    border-top-color: #17a2b8;
+}
+
+.card:hover {
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+}
+
+.card-title {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.text-muted {
+    color: #7f8c8d !important;
+}
+
+/* Стили для кнопок в карточке */
+.card-footer .btn {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.card-footer .btn-sm {
+    min-width: 100px;
+}
+
+.card-footer .badge {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.65rem;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .col-xl-3 {
+        margin-bottom: 15px;
+    }
+    
+    .btn-group {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 5px;
+    }
+    
+    .user-avatar,
+    .user-avatar-default {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .card-footer .btn {
+        min-width: 80px;
+        font-size: 0.75rem;
+    }
+}
+</style>
+{% endblock %}

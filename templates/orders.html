@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-shopping-cart me-2"></i>Заказы</h1>
+    <div>
+        <!-- Кнопки экспорта/импорта -->
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="fas fa-download me-2"></i>Экспорт
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='orders', format_type='excel') }}">
+                    <i class="fas fa-file-excel text-success me-2"></i>Excel (.xlsx)
+                </a></li>
+                <li><a class="dropdown-item" href="{{ url_for('export_table', table_name='orders', format_type='csv') }}">
+                    <i class="fas fa-file-csv text-primary me-2"></i>CSV (.csv)
+                </a></li>
+            </ul>
+        </div>
+
+        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#importModalOrders">
+            <i class="fas fa-upload me-2"></i>Импорт
+        </button>
+        
+        <div class="btn-group">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                Фильтр: {{ filter_status|replace('_', ' ')|title }}
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('orders') }}?status=все">Все заказы</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('orders') }}?status=новый">Новые</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('orders') }}?status=в_обработке">В обработке</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('orders') }}?status=выполнен">Выполненные</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('orders') }}?status=отменен">Отмененные</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика заказов -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card bg-primary">
+            <i class="fas fa-clock fa-3x mb-3"></i>
+            <h3>{{ stats.новый or 0 }}</h3>
+            <p>Новые</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-warning">
+            <i class="fas fa-cogs fa-3x mb-3"></i>
+            <h3>{{ stats.в_обработке or 0 }}</h3>
+            <p>В обработке</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-success">
+            <i class="fas fa-check fa-3x mb-3"></i>
+            <h3>{{ stats.выполнен or 0 }}</h3>
+            <p>Выполненные</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-danger">
+            <i class="fas fa-times fa-3x mb-3"></i>
+            <h3>{{ stats.отменен or 0 }}</h3>
+            <p>Отмененные</p>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица заказов -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Список заказов</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Клиент</th>
+                        <th>Телефон</th>
+                        <th>Telegram</th>
+                        <th>Тип заказа</th>
+                        <th>Товар</th>
+                        <th>Количество</th>
+                        <th>Цена</th>
+                        <th>Итого</th>
+                        <th>Статус</th>
+                        <th>Дата</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>{{ order[0] }}</td>
+                        <td><strong>{{ order[1] or 'Не указано' }}</strong></td>
+                        <td>
+                            {% if order[2] %}
+                                <a href="tel:{{ order[2] }}">{{ order[2] }}</a>
+                                <br>
+                                <button class="btn btn-sm btn-outline-success mt-1" 
+                                        onclick="copyToClipboard('{{ order[2] }}')">
+                                    <i class="fas fa-copy"></i> Копировать
+                                </button>
+                            {% else %}
+                                <span class="text-muted">Не указан</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order[3] %}
+                                {{ order[3] }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order[4] == 'живая_туша' %}
+                                <span class="badge bg-info">Живая туша</span>
+                            {% elif order[4] == 'разделанная_туша' %}
+                                <span class="badge bg-danger">Разделанная туша</span>
+                            {% elif order[4] == 'сено' %}
+                                <span class="badge bg-success">Сено</span>
+                            {% elif order[4] == 'зерно' %}
+                                <span class="badge bg-warning">Зерно</span>
+                            {% elif order[4] == 'комбикорм' %}
+                                <span class="badge bg-secondary">Комбикорм</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ order[6] or 'Не указано' }}</td>
+                        <td>
+                            {% if order[4] in ['живая_туша', 'разделанная_туша'] %}
+                                {{ order[7] or 1 }} шт
+                            {% else %}
+                                {{ order[7] or 0 }} кг
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order[4] in ['живая_туша', 'разделанная_туша'] %}
+                                <strong>{{ order[8] or 0 }} ₸</strong>
+                                <br><small class="text-muted">за шт</small>
+                            {% else %}
+                                <strong>{{ order[8] or 0 }} ₸</strong>
+                                <br><small class="text-muted">за кг</small>
+                            {% endif %}
+                        </td>
+                        <td><strong class="text-success">{{ order[9] or 0 }} ₸</strong></td>
+                        <td>
+                            <form method="POST" action="{{ url_for('update_order_status', order_id=order[0]) }}" class="d-inline">
+                                <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                                    <option value="новый" {% if order[10] == 'новый' %}selected{% endif %}>Новый</option>
+                                    <option value="в_обработке" {% if order[10] == 'в_обработке' %}selected{% endif %}>В обработке</option>
+                                    <option value="выполнен" {% if order[10] == 'выполнен' %}selected{% endif %}>Выполнен</option>
+                                    <option value="отменен" {% if order[10] == 'отменен' %}selected{% endif %}>Отменен</option>
+                                </select>
+                            </form>
+                        </td>
+                        <td>
+                            {% if order[12] is string %}
+                                {{ order[12] }}
+                            {% elif order[12] %}
+                                {{ order[12].strftime('%d.%m.%Y %H:%M') }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <!-- Кнопка просмотра -->
+                                <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#orderModal{{ order[0] }}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                
+                                <!-- Кнопка добавления примечаний -->
+                                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#notesModal{{ order[0] }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                
+                                <!-- Кнопка удаления -->
+                                {% if session.role == 'admin' %}
+                                <form method="POST" action="{{ url_for('delete_order', order_id=order[0]) }}" 
+                                      class="d-inline" onsubmit="return confirm('Удалить этот заказ?');">
+                                    <button type="submit" class="btn btn-outline-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                
+                                <!-- Кнопка звонка -->
+                                {% if order[2] %}
+                                <a href="tel:{{ order[2] }}" class="btn btn-outline-success">
+                                    <i class="fas fa-phone"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Модальное окно просмотра заказа -->
+                    <div class="modal fade" id="orderModal{{ order[0] }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Заказ #{{ order[0] }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <strong>Клиент:</strong> {{ order[1] or 'Не указано' }}<br>
+                                        {% if order[3] %}
+                                        <strong>Telegram:</strong> {{ order[3] }}<br>
+                                        {% endif %}
+                                        <strong>Телефон:</strong> {{ order[2] or 'Не указан' }}
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Тип заказа:</strong> 
+                                        {% if order[4] == 'живая_туша' %}Живая туша
+                                        {% elif order[4] == 'разделанная_туша' %}Разделанная туша
+                                        {% elif order[4] == 'сено' %}Сено
+                                        {% elif order[4] == 'зерно' %}Зерно
+                                        {% elif order[4] == 'комбикорм' %}Комбикорм
+                                        {% else %}{{ order[4] }}{% endif %}
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Товар:</strong> {{ order[6] or 'Не указано' }}<br>
+                                        <strong>Количество:</strong> 
+                                        {% if order[4] in ['живая_туша', 'разделанная_туша'] %}
+                                            {{ order[7] or 1 }} шт
+                                        {% else %}
+                                            {{ order[7] or 0 }} кг
+                                        {% endif %}
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Цена:</strong> {{ order[8] or 0 }} ₸
+                                        {% if order[4] in ['живая_туша', 'разделанная_туша'] %}
+                                            (за шт)
+                                        {% else %}
+                                            (за кг)
+                                        {% endif %}
+                                        <br>
+                                        <strong>Итого:</strong> {{ order[9] or 0 }} ₸
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Статус:</strong> 
+                                        <span class="badge 
+                                            {% if order[10] == 'новый' %}bg-primary
+                                            {% elif order[10] == 'в_обработке' %}bg-warning
+                                            {% elif order[10] == 'выполнен' %}bg-success
+                                            {% else %}bg-danger{% endif %}">
+                                            {{ order[10]|replace('_', ' ')|title }}
+                                        </span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Примечания:</strong><br>
+                                        <div class="alert alert-light">{{ order[11] or 'Нет примечаний' }}</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Дата создания:</strong> 
+                                        {% if order[12] is string %}
+                                            {{ order[12] }}
+                                        {% elif order[12] %}
+                                            {{ order[12].strftime('%d.%m.%Y %H:%M') }}
+                                        {% else %}
+                                            Не указана
+                                        {% endif %}<br>
+                                        <strong>Последнее обновление:</strong> 
+                                        {% if order[13] is string %}
+                                            {{ order[13] }}
+                                        {% elif order[13] %}
+                                            {{ order[13].strftime('%d.%m.%Y %H:%M') }}
+                                        {% else %}
+                                            Не указана
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Модальное окно для примечаний -->
+                    <div class="modal fade" id="notesModal{{ order[0] }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Примечания к заказу #{{ order[0] }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('update_order_notes', order_id=order[0]) }}">
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Примечания:</label>
+                                            <textarea name="notes" class="form-control" rows="4">{{ order[11] or '' }}</textarea>
+                                            <small class="text-muted">Внутренние заметки по заказу</small>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        alert('Номер телефона скопирован: ' + text);
+    }, function(err) {
+        console.error('Ошибка копирования: ', err);
+    });
+}
+</script>
+{% endblock %}
